@@ -1,0 +1,53 @@
+{
+  "manifest_version": 2,
+  "name": "YouTube Cards",
+  "description": "",
+  "author": "Gilaniel",
+  "version": "0.1",
+  "icons":{
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "browser_action": {
+    "default_icon": {
+      "19": "icon19.png",
+      "38": "icon38.png"
+    }
+  },
+  "background": {
+    "scripts": [
+      "js/jquery.min.js",
+      "bus.js"
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": [ "http://gila.api.yt-dev.1124.ru/*","http://develop.api.yt-dev.1124.ru/*","http://dmitriy.api.yt-dev.1124.ru/*","http://backoffice.kedoo.com/*","http://backoffice2.kedoo.com/*"],
+      "js": ["js/jquery.min.js", "content_scripts.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "content_security_policy": "script-src 'self' https://www.youtube.com/iframe_api https://s.ytimg.com; object-src 'self'",
+  "web_accessible_resources": ["js/jquery.min.js"],
+  "permissions": [
+    "http://localhost/",
+    "http://gila.api.yt-dev.1124.ru/",
+    "http://develop.api.yt-dev.1124.ru/",
+    "http://dmitriy.api.yt-dev.1124.ru/",
+    "http://backoffice.kedoo.com/",
+    "http://backoffice2.kedoo.com/",
+    "tabs",
+    "https://www.youtube.com/",
+    "https://www.youtube.com/iframe_api",
+    "https://s.ytimg.com/yts/jsbin/*",
+    "http://develop.api.yt-dev.1124.ru/api/*",
+    "webRequest",
+    "activeTab",
+    "cookies",
+    "bookmarks",
+    "debugger",
+    "pageCapture",
+    "storage",
+    "topSites"
+]
+}
