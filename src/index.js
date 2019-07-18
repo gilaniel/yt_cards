@@ -1,6 +1,6 @@
 import content from './content_scripts';
 
-const page = /tools/;
+const page = /cards/;
 const match = page.exec(document.URL);
 
 if(match){

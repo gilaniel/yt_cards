@@ -22,7 +22,14 @@
   },
   "content_scripts": [
     {
-      "matches": [ "http://gila.api.yt-dev.1124.ru/*","http://develop.api.yt-dev.1124.ru/*","http://dmitriy.api.yt-dev.1124.ru/*","http://backoffice.kedoo.com/*","http://backoffice2.kedoo.com/*"],
+      "matches": [ 
+        "http://gila.api.yt-dev.1124.ru/*",
+        "http://develop.api.yt-dev.1124.ru/*",
+        "http://dmitriy.api.yt-dev.1124.ru/*",
+        "http://backoffice.kedoo.com/*",
+        "http://backoffice2.kedoo.com/*",
+        "http://local.yt-api.com/*"
+      ],
       "js": ["js/jquery.min.js", "content_scripts.js"],
       "run_at": "document_end"
     }
@@ -36,6 +43,7 @@
     "http://dmitriy.api.yt-dev.1124.ru/",
     "http://backoffice.kedoo.com/",
     "http://backoffice2.kedoo.com/",
+    "http://local.yt-api.com/",
     "tabs",
     "https://www.youtube.com/",
     "https://www.youtube.com/iframe_api",

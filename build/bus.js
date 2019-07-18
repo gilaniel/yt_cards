@@ -56,7 +56,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 
     return true;
   } else if (request.action === "get_pl_videos") {
-    url = `https://www.youtube.com/playlist?list=PLutU0Yy9nuKQXdXt-udVqYKSQ-XhyCslU`;
+    url = `https://www.youtube.com/playlist?list=PLLHjKKyQ4OaRBovIByIpmUAFX85KW-YUE`;
 
     fetch(url)
       .then(response => response.text())

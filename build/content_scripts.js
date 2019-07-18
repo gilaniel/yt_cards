@@ -140,13 +140,40 @@ function listItemTmp(item) {
       return el.textContent.indexOf("GUIDED_HELP") > -1;
     });
 
+    try {
+      sText = sText[0].textContent.split('var ytInitialGuideData = JSON.parse(')[1].split(');')[0];
+      sText = JSON.parse(sText);
+      sText = JSON.parse(sText);
+      var serviceParams = sText.responseContext.serviceTrackingParams;
+      serviceParams.forEach(function (item) {
+        if (item.service === 'GUIDED_HELP') {
+          ytId = item.params[0].value;
+        }
+      });
+
+      if (ytId) {
+        getChannelTitle(channelId);
+        checkAuthState(elArr, channelId);
+        return;
+      } else {
+        throw new Error('no channel ID');
+      }
+    } catch (e) {
+      console.log(e);
+    }
+
+    sText = elArr.filter(function (el) {
+      return el.textContent.indexOf("GUIDED_HELP") > -1;
+    });
+
     if (sText[0].textContent.indexOf('creator_channel_id","value":"') > -1) {
       channelId = /creator_channel_id","value":"([^"]+)"/.exec(sText[0].textContent)[1];
     } else {
-      sText = elArr.filter(function (el) {
-        return el.textContent.indexOf("GAPI_HINT_PARAMS") > -1;
-      });
-      channelId = /creator_channel_id":"([^"]+)"/.exec(sText[0].textContent)[1];
+      channelId = $(doc).find('.spf-link[title="Мой канал"]').attr('href') || $(doc).find('.spf-link[title="My channel"]').attr('href');
+      channelId = channelId.split('/channel/')[1]; // sText = elArr.filter(function(el) {
+      //   return el.textContent.indexOf("GAPI_HINT_PARAMS") > -1;
+      // });
+      // channelId = /creator_channel_id":"([^"]+)"/.exec(sText[0].textContent)[1];
     }
 
     getChannelTitle(channelId);
@@ -199,6 +226,24 @@ function listItemTmp(item) {
     checkChannelId(channelId);
   }
 
+  function getNewVideos() {
+    $.get('/admin/cards?channel_id=' + channelId).then(function (payload) {
+      var promiseArr = [];
+      clearVideoCount += payload.data.videos.length;
+      payload.data.videos.forEach(function (item) {
+        var video = {
+          playlistVideoRenderer: {
+            videoId: item
+          }
+        };
+        checkVideoCard(item, video, promiseArr);
+      });
+      Promise.all(promiseArr).then(function (results) {
+        Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOff"])();
+      });
+    });
+  }
+
   function getTopPlVideos() {
     chrome.runtime.sendMessage({
       action: "get_pl_videos",
@@ -213,31 +258,44 @@ function listItemTmp(item) {
       var ytData = sText[0].textContent.split('window["ytInitialData"] = ')[1].split(";");
       topPlVideos = JSON.parse(ytData[0]).contents.twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].itemSectionRenderer.contents[0].playlistVideoListRenderer.contents;
       clearVideoCount = topPlVideos.length;
+      var promiseArr = [];
       topPlVideos.forEach(function (item) {
         var video = item.playlistVideoRenderer;
 
         if (video.lengthSeconds) {
-          chrome.runtime.sendMessage({
-            action: "check_card",
-            v: video.videoId
-          }, function (response) {
-            item["cards"] = [];
-
-            if (response.feature_templates.length && response.feature_templates[0].key) {
-              item["has_card"] = true;
-              item["cards"] = response.feature_templates;
-              doneVideoCount++;
-              clearVideoCount--;
-            }
-
-            Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOff"])();
-            $(".js-videos-count").removeClass("hide");
-            $(".js-all-count").text(clearVideoCount);
-            $(".js-done-count").text(doneVideoCount);
-          });
+          checkVideoCard(video.videoId, item, promiseArr);
+        } else {
+          clearVideoCount--;
         }
       });
+      Promise.all(promiseArr).then(function (results) {
+        getNewVideos();
+      });
     });
+  }
+
+  function checkVideoCard(videoId, item, promiseArr) {
+    var videoPromise = new Promise(function (resolve, reject) {
+      chrome.runtime.sendMessage({
+        action: "check_card",
+        v: videoId
+      }, function (response) {
+        item["cards"] = [];
+
+        if (response.feature_templates.length && response.feature_templates[0].key) {
+          item["has_card"] = true;
+          item["cards"] = response.feature_templates;
+          doneVideoCount++;
+          clearVideoCount--;
+        }
+
+        $(".js-videos-count").removeClass("hide");
+        $(".js-all-count").text(clearVideoCount);
+        $(".js-done-count").text(doneVideoCount);
+        resolve(item);
+      });
+    });
+    promiseArr.push(videoPromise);
   }
 
   function setCard(videoData, video, clearResolve) {
@@ -303,13 +361,17 @@ function listItemTmp(item) {
             v: videoData.videoId,
             params: params
           }, function (response) {
+            var lastError = chrome.runtime.lastError;
             Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageSetItem"])('IDS', params.video_item_id);
             Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageSetItem"])('MESSAGES', params.custom_message);
             Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageSetItem"])('TEASERS', params.teaser_text);
             resolve();
 
-            if (response.error) {
+            if (lastError || response.error) {
+              console.log(lastError.message); // 'Could not establish connection. Receiving end does not exist.'
+
               reject();
+              return;
             }
 
             if (idx === links.length - 1) {
@@ -474,53 +536,6 @@ function listItemTmp(item) {
       } // $(e.currentTarget).closest('div').toggleClass('focus');
 
     }
-  }); // HIDE LIST ON ESC PRESS
-
-  $('body').keydown(function (e) {
-    if (e.which === 27) {
-      $('.list-ico').removeClass('open');
-      $('.list-block').removeClass('focus');
-    }
-  }); // SET LIST ITEM VALUE TO INPUT
-
-  $('body').on('click', '.js-list-item', function (e) {
-    var value = e.currentTarget.innerHTML;
-    $(e.currentTarget).parent().siblings('input').val(value).trigger("change");
-    $('.list-block').removeClass('focus');
-    $('.list-ico').removeClass('open');
-  });
-  $('.video_item_id').on('change', function (e) {
-    var item = $(e.currentTarget);
-    var id = item.data('id');
-    var teaser = $("input.teaser_text[data-id=\"".concat(id, "\"]"));
-    var message = $("input.custom_message[data-id=\"".concat(id, "\"]"));
-    var val = item.val();
-
-    if (val.substr(0, 2) === 'UC') {
-      if (!teaser.val()) {
-        teaser.addClass('b-input-error');
-      }
-
-      if (!message.val()) {
-        message.addClass('b-input-error');
-      }
-    } else {
-      teaser.removeClass('b-input-error');
-      message.removeClass('b-input-error');
-    }
-  });
-  $('.custom_message,.teaser_text').on('change input', function (e) {
-    var item = $(e.currentTarget);
-    var id = item.data('id');
-    var video = $("input.video_item_id[data-id=\"".concat(id, "\"]"));
-
-    if (video.val().substr(0, 2) === 'UC') {
-      if (item.val()) {
-        item.removeClass('b-input-error');
-      } else {
-        item.addClass('b-input-error');
-      }
-    }
   });
 });
 
@@ -609,7 +624,7 @@ function unique(arr) {
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _content_scripts__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./content_scripts */ "./src/content_scripts.js");
 
-var page = /tools/;
+var page = /cards/;
 var match = page.exec(document.URL);
 
 if (match) {
