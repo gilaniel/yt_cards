@@ -113,6 +113,8 @@ function listItemTmp(item) {
   var ch_id_name = "tools_channel_id";
   var channelId = "";
   var topPlVideos = [];
+  var ytVideos = [];
+  var cardsTemplates = [];
   var clearVideoCount = 0;
   var doneVideoCount = 0;
   var templates = {
@@ -124,6 +126,7 @@ function listItemTmp(item) {
 
   function checkUser() {
     Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOn"])();
+    $('body').append('<script id="initApp"></script>');
     chrome.runtime.sendMessage({
       action: "get_id"
     }, function (response) {
@@ -152,7 +155,6 @@ function listItemTmp(item) {
       });
 
       if (ytId) {
-        getChannelTitle(channelId);
         checkAuthState(elArr, channelId);
         return;
       } else {
@@ -176,7 +178,6 @@ function listItemTmp(item) {
       // channelId = /creator_channel_id":"([^"]+)"/.exec(sText[0].textContent)[1];
     }
 
-    getChannelTitle(channelId);
     checkAuthState(elArr, channelId);
   }
 
@@ -196,6 +197,7 @@ function listItemTmp(item) {
       }
 
       $(".channel-title").html(title);
+      getNewVideos(); // loadOff();
     });
   }
 
@@ -221,9 +223,10 @@ function listItemTmp(item) {
       auth_token = /XSRF_TOKEN': "([^"]+)"/.exec(tagText[0].textContent)[1];
     }
 
-    setCookie(channelId, auth_token);
-    getTopPlVideos();
-    checkChannelId(channelId);
+    setCookie(channelId, auth_token); // getNewVideos();
+
+    getChannelTitle(channelId);
+    localStorage.setItem(ch_id_name, channelId);
   }
 
   function getNewVideos() {
@@ -233,21 +236,25 @@ function listItemTmp(item) {
       payload.data.videos.forEach(function (item) {
         var video = {
           playlistVideoRenderer: {
-            videoId: item
+            videoId: item[0],
+            lengthSeconds: item[1]
           }
         };
-        checkVideoCard(item, video, promiseArr);
+        ytVideos.push(video);
+        checkVideoCard(item[0], video, promiseArr);
       });
       Promise.all(promiseArr).then(function (results) {
         Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOff"])();
+        $(".js-all-count").text(ytVideos.concat(topPlVideos).length);
       });
     });
   }
 
-  function getTopPlVideos() {
+  function getTopPlVideos(plId) {
+    Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOn"])();
     chrome.runtime.sendMessage({
       action: "get_pl_videos",
-      id: channelId
+      plId: plId
     }, function (response) {
       var parser = new DOMParser();
       var doc = parser.parseFromString(response, "text/html");
@@ -269,7 +276,8 @@ function listItemTmp(item) {
         }
       });
       Promise.all(promiseArr).then(function (results) {
-        getNewVideos();
+        Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOff"])();
+        $(".js-all-count").text(ytVideos.concat(topPlVideos).length);
       });
     });
   }
@@ -285,119 +293,54 @@ function listItemTmp(item) {
         if (response.feature_templates.length && response.feature_templates[0].key) {
           item["has_card"] = true;
           item["cards"] = response.feature_templates;
-          doneVideoCount++;
-          clearVideoCount--;
         }
 
         $(".js-videos-count").removeClass("hide");
-        $(".js-all-count").text(clearVideoCount);
-        $(".js-done-count").text(doneVideoCount);
         resolve(item);
       });
     });
     promiseArr.push(videoPromise);
   }
 
-  function setCard(videoData, video, clearResolve) {
-    return new Promise(function (setResolve) {
-      var params = {
-        key: "",
-        type: "video",
-        start_ms: 30000,
-        show_warnings: true,
-        video_item_id: "",
-        video_url: "",
-        custom_message: "",
-        teaser_text: "",
-        session_token: Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["getCookie"])(cookie_name + channelId)
-      };
-      var lengthStep = 120 * 1000;
+  function setCard(videos) {
+    return new Promise(function (resolve, reject) {
+      videos.forEach(function (item, idx, array) {
+        chrome.runtime.sendMessage({
+          action: "set_card",
+          v: item.video.playlistVideoRenderer.videoId,
+          params: item.params
+        }, function (response) {
+          var lastError = chrome.runtime.lastError;
+          Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageSetItem"])('IDS', item.params.video_item_id);
+          Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageSetItem"])('MESSAGES', item.params.custom_message);
+          Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageSetItem"])('TEASERS', item.params.teaser_text);
 
-      if (videoData.lengthSeconds < 600) {
-        lengthStep = Math.round(videoData.lengthSeconds / 6 * 1000);
-        params.start_ms = lengthStep;
-      }
+          if (lastError || response.error) {
+            console.log(response);
+            reject();
+            return;
+          }
 
-      var links = [];
-      var messages = [];
-      var teasers = [];
-      $(".video_item_id").each(function (idx, item) {
-        if (item.value) {
-          links.push(item.value);
-        }
-      });
-      $(".custom_message").each(function (idx, item) {
-        messages.push(item.value ? item.value : '');
-      });
-      $(".teaser_text").each(function (idx, item) {
-        teasers.push(item.value ? item.value : '');
-      });
+          var allVideos = ytVideos.concat(topPlVideos);
 
-      var setCardRequest = function setCardRequest(cardVideoId, idx) {
-        if (cardVideoId.substr(0, 2) === 'UC') {
-          delete params.action_create_video;
-          params['action_create_collaborator'] = 1;
-          params['channel_url'] = cardVideoId;
-          params['type'] = 'collaborator';
-        } else {
-          delete params.channel_url;
-          delete params.action_create_collaborator;
-          params['action_create_video'] = 1;
-          params['type'] = 'video';
-        }
-
-        params.video_item_id = cardVideoId;
-        params.custom_message = messages[idx];
-        params.teaser_text = teasers[idx];
-
-        if (idx > 0) {
-          params.start_ms += lengthStep;
-        }
-
-        $('.cat-loader').addClass('_show');
-        return new Promise(function (resolve, reject) {
-          chrome.runtime.sendMessage({
-            action: "set_card",
-            v: videoData.videoId,
-            params: params
-          }, function (response) {
-            var lastError = chrome.runtime.lastError;
-            Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageSetItem"])('IDS', params.video_item_id);
-            Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageSetItem"])('MESSAGES', params.custom_message);
-            Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageSetItem"])('TEASERS', params.teaser_text);
+          if (idx === array.length - 1) {
+            console.log('done');
             resolve();
+          } // if (idx === links.length - 1) {
+          //   doneVideoCount ++;
+          //   $('.progress-bar-fill').css('width',100 * (doneVideoCount) / allVideos.length + '%');
+          //   let templates = response
+          //     .split('response">')[1]
+          //     .split("</textarea>")[0];
+          //   video["cards"] = JSON.parse(templates).feature_templates;
+          //   video["has_card"] = true;
+          //   getTemplates();
+          // }
 
-            if (lastError || response.error) {
-              console.log(lastError.message); // 'Could not establish connection. Receiving end does not exist.'
-
-              reject();
-              return;
-            }
-
-            if (idx === links.length - 1) {
-              var _templates = response.split('response">')[1].split("</textarea>")[0];
-              video["cards"] = JSON.parse(_templates).feature_templates;
-              clearVideoCount--;
-              doneVideoCount++;
-              video["has_card"] = true;
-              $(".js-all-count").text(clearVideoCount);
-              $(".js-done-count").text(doneVideoCount);
-              getTemplates();
-              setTimeout(function () {
-                $('.cat-loader').removeClass('_show');
-                clearResolve ? clearResolve() : setResolve();
-              }, 1000);
-            }
-          });
         });
-      };
-
-      links.reduce(function (previousPromise, cardVideoId, idx) {
-        return previousPromise.then(function () {
-          return setCardRequest(cardVideoId, idx);
-        });
-      }, Promise.resolve());
+      });
     });
+    promiseArr.push(videoPromise);
   }
 
   function clearCard(options) {
@@ -408,18 +351,17 @@ function listItemTmp(item) {
       var setCardRequest = function setCardRequest(item, idx) {
         var params = {
           key: item.key,
-          type: item.type,
-          start_ms: item.start_ms,
-          show_warnings: true,
-          video_item_id: item.video_id,
-          video_url: "",
-          channel_url: item.channel_url,
-          custom_message: item.custom_message,
-          teaser_text: item.teaser_text,
+          // type: item.type,
+          // start_ms: item.start_ms,
+          // show_warnings: true,
+          // video_item_id: item.video_id,
+          // video_url: "",
+          // channel_url: item.channel_url,
+          // custom_message: item.custom_message,
+          // teaser_text: item.teaser_text,
           session_token: Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["getCookie"])(cookie_name + channelId)
         };
         return new Promise(function (resolve) {
-          $('.cat-loader').addClass('_show');
           chrome.runtime.sendMessage({
             action: "clear_card",
             v: videoData.videoId,
@@ -429,11 +371,6 @@ function listItemTmp(item) {
 
             if (idx === video.cards.length - 1) {
               delete video["has_card"];
-              clearVideoCount++;
-              doneVideoCount--;
-              $(".js-all-count").text(clearVideoCount);
-              $(".js-done-count").text(doneVideoCount);
-              $('.cat-loader').removeClass('_show');
               set ? setCard(videoData, video, mainResolve) : mainResolve();
             }
           });
@@ -448,12 +385,31 @@ function listItemTmp(item) {
     });
   }
 
-  function checkChannelId(channelId) {
-    if (localStorage.getItem(ch_id_name) != channelId) {
-      localStorage.setItem(ch_id_name, channelId);
-    } else {
-      localStorage.setItem(ch_id_name, channelId);
-    }
+  function copyCards(videoId) {
+    Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOn"])();
+    chrome.runtime.sendMessage({
+      action: "check_card",
+      v: videoId
+    }, function (response) {
+      if (response.feature_templates.length && response.feature_templates[0].key) {
+        cardsTemplates = response.feature_templates;
+        fillCards();
+        Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOff"])();
+      }
+    });
+  }
+
+  function fillCards() {
+    $('.card-block').each(function (idx, item) {
+      if (!cardsTemplates[idx]) return;
+      var id = cardsTemplates[idx].video_id || cardsTemplates[idx].playlist_id || cardsTemplates[idx].channel_url;
+      var custom_message = cardsTemplates[idx].custom_message;
+      var teaser_text = cardsTemplates[idx].teaser_text;
+      item = $(item);
+      item.find('.video_item_id').val(id);
+      item.find('.custom_message').val(custom_message);
+      item.find('.teaser_text').val(teaser_text);
+    });
   }
 
   function setCookie(channelId, auth_token) {
@@ -490,7 +446,85 @@ function listItemTmp(item) {
       }
     });
     if (!links.length) return;
-    topPlVideos.reduce(function (previousPromise, item) {
+    doneVideoCount = 0;
+    var sendArray = [];
+
+    var _loop = function _loop(i) {
+      topPlVideos.concat(ytVideos.slice(0, 5)).forEach(function (item, idx) {
+        var messages = [];
+        var teasers = [];
+        $(".custom_message").each(function (idx, item) {
+          messages.push(item.value ? item.value : '');
+        });
+        $(".teaser_text").each(function (idx, item) {
+          teasers.push(item.value ? item.value : '');
+        });
+        var videoData = item.playlistVideoRenderer;
+        var params = {
+          key: "",
+          type: "video",
+          start_ms: 30000,
+          show_warnings: true,
+          video_item_id: "",
+          video_url: "",
+          custom_message: "",
+          teaser_text: "",
+          session_token: Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["getCookie"])(cookie_name + channelId)
+        };
+        var lengthStep = 120 * 1000;
+
+        if (videoData.lengthSeconds < 600) {
+          lengthStep = Math.round(videoData.lengthSeconds / 6 * 1000);
+          params.start_ms = lengthStep;
+        }
+
+        if (links[i].indexOf('youtube') > -1) {
+          delete params.action_create_video;
+          params['action_create_collaborator'] = 1;
+          params['channel_url'] = links[i];
+          params['type'] = 'collaborator';
+        } else {
+          delete params.channel_url;
+          delete params.action_create_collaborator;
+          params['action_create_video'] = 1;
+          params['type'] = 'video';
+        }
+
+        params.video_item_id = links[i];
+        params.custom_message = messages[i];
+        params.teaser_text = teasers[i];
+
+        if (i > 0) {
+          params.start_ms += lengthStep;
+        }
+
+        sendArray.push({
+          video: item,
+          params: params
+        });
+      });
+    };
+
+    for (var i = 0; i < links.length; i++) {
+      _loop(i);
+    }
+
+    var size = 10;
+    var subarray = [];
+
+    for (var i = 0; i < Math.ceil(sendArray.length / size); i++) {
+      subarray[i] = sendArray.slice(i * size, i * size + size);
+    }
+
+    subarray.reduce(function (previousPromise, subItem) {
+      return previousPromise.then(function () {
+        return setCard(subItem);
+      })["catch"](function () {
+        console.log('error');
+      });
+    }, Promise.resolve());
+    return;
+    topPlVideos.concat(ytVideos.slice(0, 5)).reduce(function (previousPromise, item) {
       return previousPromise.then(function () {
         if (item.has_card) {
           return clearCard({
@@ -507,7 +541,7 @@ function listItemTmp(item) {
 
   $(".js-clear-card-btn").on("click", function (e) {
     e.preventDefault();
-    topPlVideos.reduce(function (previousPromise, item) {
+    topPlVideos.concat(ytVideos).reduce(function (previousPromise, item) {
       if (!item.has_card) {
         return Promise.resolve();
       }
@@ -536,6 +570,16 @@ function listItemTmp(item) {
       } // $(e.currentTarget).closest('div').toggleClass('focus');
 
     }
+  });
+  $('.js-get-list').on('click', function () {
+    var plId = $('.js-pl-id').val();
+    if (!plId) return;
+    getTopPlVideos(plId);
+  });
+  $('.js-copy-cards').on('click', function () {
+    var videoId = $('.js-video-id').val();
+    if (!videoId) return;
+    copyCards(videoId);
   });
 });
 

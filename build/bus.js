@@ -24,7 +24,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         sendResponse(resp);
       },
       error: function() {
-        sendResponse({ error: "error" });
+        sendResponse({ error: "error", videoId: request.v});
       }
     });
     return true;
@@ -56,7 +56,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 
     return true;
   } else if (request.action === "get_pl_videos") {
-    url = `https://www.youtube.com/playlist?list=PLLHjKKyQ4OaRBovIByIpmUAFX85KW-YUE`;
+    url = `https://www.youtube.com/playlist?list=${request.plId}`;
 
     fetch(url)
       .then(response => response.text())
