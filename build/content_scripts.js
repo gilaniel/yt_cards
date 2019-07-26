@@ -120,7 +120,8 @@ function listItemTmp(item) {
   var templates = {
     IDS: [],
     MESSAGES: [],
-    TEASERS: []
+    TEASERS: [],
+    COPY_IDS: []
   };
   checkUser();
 
@@ -277,7 +278,8 @@ function listItemTmp(item) {
       });
       Promise.all(promiseArr).then(function (results) {
         Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOff"])();
-        $(".js-all-count").text(ytVideos.concat(topPlVideos).length);
+        ytVideos = ytVideos.concat(topPlVideos);
+        $(".js-all-count").text(ytVideos.length);
       });
     });
   }
@@ -302,7 +304,7 @@ function listItemTmp(item) {
     promiseArr.push(videoPromise);
   }
 
-  function setCard(videos) {
+  function setCard(videos, allVideos) {
     return new Promise(function (resolve, reject) {
       videos.forEach(function (item, idx, array) {
         chrome.runtime.sendMessage({
@@ -310,25 +312,32 @@ function listItemTmp(item) {
           v: item.video.playlistVideoRenderer.videoId,
           params: item.params
         }, function (response) {
-          var lastError = chrome.runtime.lastError;
           Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageSetItem"])('IDS', item.params.video_item_id);
           Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageSetItem"])('MESSAGES', item.params.custom_message);
           Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageSetItem"])('TEASERS', item.params.teaser_text);
 
-          if (lastError || response.error) {
+          if (response.error) {
             console.log(response);
             reject();
             return;
           }
 
-          var allVideos = ytVideos.concat(topPlVideos);
+          var video = ytVideos.find(function (element) {
+            return element.playlistVideoRenderer.videoId == item.video.playlistVideoRenderer.videoId;
+          });
+          var templates = response.split('response">')[1].split("</textarea>")[0];
+          video["cards"] = JSON.parse(templates).feature_templates;
+          doneVideoCount++;
+          console.log(doneVideoCount);
+          console.log('allvideos - ' + allVideos.length);
+          $('.progress-bar-fill').css('width', 100 * doneVideoCount / allVideos.length + '%');
 
           if (idx === array.length - 1) {
             console.log('done');
             resolve();
           } // if (idx === links.length - 1) {
           //   doneVideoCount ++;
-          //   $('.progress-bar-fill').css('width',100 * (doneVideoCount) / allVideos.length + '%');
+          //   $('.progress-bar-fill').css('width',100 * (doneVideoCount) / ytVideos.length + '%');
           //   let templates = response
           //     .split('response">')[1]
           //     .split("</textarea>")[0];
@@ -343,47 +352,38 @@ function listItemTmp(item) {
     promiseArr.push(videoPromise);
   }
 
-  function clearCard(options) {
-    var videoData = options.videoData,
-        video = options.video,
-        set = options.set;
-    return new Promise(function (mainResolve) {
-      var setCardRequest = function setCardRequest(item, idx) {
+  function clearCard(videos) {
+    return new Promise(function (resolve) {
+      videos.forEach(function (item, idx, array) {
         var params = {
           key: item.key,
-          // type: item.type,
-          // start_ms: item.start_ms,
-          // show_warnings: true,
-          // video_item_id: item.video_id,
-          // video_url: "",
-          // channel_url: item.channel_url,
-          // custom_message: item.custom_message,
-          // teaser_text: item.teaser_text,
           session_token: Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["getCookie"])(cookie_name + channelId)
         };
-        return new Promise(function (resolve) {
-          chrome.runtime.sendMessage({
-            action: "clear_card",
-            v: videoData.videoId,
-            params: params
-          }, function () {
-            resolve();
+        chrome.runtime.sendMessage({
+          action: "clear_card",
+          v: item.id,
+          params: params
+        }, function (response) {
+          if (response.error) {
+            console.log(response);
+            reject();
+            return;
+          }
 
-            if (idx === video.cards.length - 1) {
-              delete video["has_card"];
-              set ? setCard(videoData, video, mainResolve) : mainResolve();
-            }
+          var video = ytVideos.find(function (element) {
+            return element.playlistVideoRenderer.videoId == item.id;
           });
-        });
-      };
+          video["cards"] = response.feature_templates;
 
-      video.cards.reduce(function (previousPromise, item, idx) {
-        return previousPromise.then(function () {
-          return setCardRequest(item, idx);
+          if (idx === array.length - 1) {
+            resolve();
+          }
         });
-      }, Promise.resolve());
+      });
     });
   }
+
+  function find() {}
 
   function copyCards(videoId) {
     Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOn"])();
@@ -391,11 +391,16 @@ function listItemTmp(item) {
       action: "check_card",
       v: videoId
     }, function (response) {
-      if (response.feature_templates.length && response.feature_templates[0].key) {
+      if (response.feature_templates && response.feature_templates.length && response.feature_templates[0].key) {
         cardsTemplates = response.feature_templates;
         fillCards();
-        Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOff"])();
+        Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageSetItem"])('COPY_IDS', videoId);
+        getTemplates();
+      } else {
+        alert('Bad Video Id: ' + videoId);
       }
+
+      Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOff"])();
     });
   }
 
@@ -424,6 +429,7 @@ function listItemTmp(item) {
     templates.IDS = Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageGetItem"])('IDS') || [];
     templates.MESSAGES = Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageGetItem"])('MESSAGES') || [];
     templates.TEASERS = Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageGetItem"])('TEASERS') || [];
+    templates.COPY_IDS = Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageGetItem"])('COPY_IDS') || [];
     $('.list-content').html('');
     templates.IDS.forEach(function (item) {
       $('.ids-list').append(listItemTmp(item));
@@ -434,6 +440,60 @@ function listItemTmp(item) {
     templates.TEASERS.forEach(function (item) {
       $('.teasers-list').append(listItemTmp(item));
     });
+    templates.COPY_IDS.forEach(function (item) {
+      $('.copy-ids-list').append(listItemTmp(item));
+    });
+  }
+
+  function getParams(links, item, i) {
+    var messages = [];
+    var teasers = [];
+    $(".custom_message").each(function (idx, item) {
+      messages.push(item.value ? item.value : '');
+    });
+    $(".teaser_text").each(function (idx, item) {
+      teasers.push(item.value ? item.value : '');
+    });
+    var videoData = item.playlistVideoRenderer;
+    var params = {
+      key: "",
+      type: "video",
+      start_ms: 30000,
+      show_warnings: true,
+      video_item_id: "",
+      video_url: "",
+      custom_message: "",
+      teaser_text: "",
+      session_token: Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["getCookie"])(cookie_name + channelId)
+    };
+    var lengthStep = 120 * 1000;
+
+    if (videoData.lengthSeconds < 600) {
+      lengthStep = Math.round(videoData.lengthSeconds / 6 * 1000);
+      params.start_ms = lengthStep;
+    }
+
+    if (links[i].indexOf('youtube') > -1) {
+      delete params.action_create_video;
+      params['action_create_collaborator'] = 1;
+      params['channel_url'] = links[i];
+      params['type'] = 'collaborator';
+    } else {
+      delete params.channel_url;
+      delete params.action_create_collaborator;
+      params['action_create_video'] = 1;
+      params['type'] = 'video';
+    }
+
+    params.video_item_id = links[i];
+    params.custom_message = messages[i];
+    params.teaser_text = teasers[i];
+
+    if (i > 0) {
+      params.start_ms += lengthStep;
+    }
+
+    return params;
   } // SET CARDS
 
 
@@ -445,60 +505,18 @@ function listItemTmp(item) {
         links.push(item.value);
       }
     });
-    if (!links.length) return;
+    if (!links.length || $('.b-input-error').length) return;
+    $('.progress-bar').addClass('_show');
+    $('.progress-bar-fill').css('width', 0 + '%');
     doneVideoCount = 0;
-    var sendArray = [];
+    var clearArray = [];
+    var filledArray = [];
+    var filledArrayToClear = [];
 
     var _loop = function _loop(i) {
-      topPlVideos.concat(ytVideos.slice(0, 5)).forEach(function (item, idx) {
-        var messages = [];
-        var teasers = [];
-        $(".custom_message").each(function (idx, item) {
-          messages.push(item.value ? item.value : '');
-        });
-        $(".teaser_text").each(function (idx, item) {
-          teasers.push(item.value ? item.value : '');
-        });
-        var videoData = item.playlistVideoRenderer;
-        var params = {
-          key: "",
-          type: "video",
-          start_ms: 30000,
-          show_warnings: true,
-          video_item_id: "",
-          video_url: "",
-          custom_message: "",
-          teaser_text: "",
-          session_token: Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["getCookie"])(cookie_name + channelId)
-        };
-        var lengthStep = 120 * 1000;
-
-        if (videoData.lengthSeconds < 600) {
-          lengthStep = Math.round(videoData.lengthSeconds / 6 * 1000);
-          params.start_ms = lengthStep;
-        }
-
-        if (links[i].indexOf('youtube') > -1) {
-          delete params.action_create_video;
-          params['action_create_collaborator'] = 1;
-          params['channel_url'] = links[i];
-          params['type'] = 'collaborator';
-        } else {
-          delete params.channel_url;
-          delete params.action_create_collaborator;
-          params['action_create_video'] = 1;
-          params['type'] = 'video';
-        }
-
-        params.video_item_id = links[i];
-        params.custom_message = messages[i];
-        params.teaser_text = teasers[i];
-
-        if (i > 0) {
-          params.start_ms += lengthStep;
-        }
-
-        sendArray.push({
+      ytVideos.slice(0, 5).forEach(function (item, idx) {
+        var params = getParams(links, item, i);
+        clearArray.push({
           video: item,
           params: params
         });
@@ -509,39 +527,74 @@ function listItemTmp(item) {
       _loop(i);
     }
 
-    var size = 10;
-    var subarray = [];
+    ytVideos.slice(0, 5).forEach(function (item, idx) {
+      if (item.cards.length) {
+        filledArray.push(item);
+      }
+    });
 
-    for (var i = 0; i < Math.ceil(sendArray.length / size); i++) {
-      subarray[i] = sendArray.slice(i * size, i * size + size);
+    var _loop2 = function _loop2(k) {
+      filledArray.forEach(function (item, idx, array) {
+        if (!item.cards[k]) return;
+        filledArrayToClear.push({
+          id: item.playlistVideoRenderer.videoId,
+          key: item.cards[k].key
+        });
+      });
+    };
+
+    for (var k = 0; k < 5; k++) {
+      _loop2(k);
     }
 
-    subarray.reduce(function (previousPromise, subItem) {
-      return previousPromise.then(function () {
-        return setCard(subItem);
-      })["catch"](function () {
-        console.log('error');
-      });
-    }, Promise.resolve());
-    return;
-    topPlVideos.concat(ytVideos.slice(0, 5)).reduce(function (previousPromise, item) {
-      return previousPromise.then(function () {
-        if (item.has_card) {
-          return clearCard({
-            videoData: item.playlistVideoRenderer,
-            video: item,
-            set: true
-          });
-        }
+    var size = 10;
+    var clearSubArray = [];
+    var filledSubArray = [];
 
-        return setCard(item.playlistVideoRenderer, item);
-      });
-    }, Promise.resolve());
+    for (var i = 0; i < Math.ceil(clearArray.length / size); i++) {
+      clearSubArray[i] = clearArray.slice(i * size, i * size + size);
+    }
+
+    for (var _i = 0; _i < Math.ceil(filledArrayToClear.length / size); _i++) {
+      filledSubArray[_i] = filledArrayToClear.slice(_i * size, _i * size + size);
+    }
+
+    var setCardPromise = function setCardPromise() {
+      clearSubArray.reduce(function (previousPromise, subItem, idx, array) {
+        return previousPromise.then(function () {
+          return setCard(subItem, clearArray).then(function () {
+            if (idx === array.length - 1) {
+              $('.progress-bar').removeClass('_show');
+              getTemplates();
+            }
+          });
+        })["catch"](function () {
+          console.log('error');
+        });
+      }, Promise.resolve());
+    };
+
+    if (filledSubArray.length) {
+      filledSubArray.reduce(function (previousPromise, subItem, idx, array) {
+        return previousPromise.then(function () {
+          return clearCard(subItem).then(function () {
+            if (idx === array.length - 1) {
+              setCardPromise();
+            }
+          });
+        })["catch"](function () {
+          console.log('error');
+        });
+      }, Promise.resolve());
+      return;
+    }
+
+    setCardPromise();
   }); // CLEAR CARDS
 
   $(".js-clear-card-btn").on("click", function (e) {
     e.preventDefault();
-    topPlVideos.concat(ytVideos).reduce(function (previousPromise, item) {
+    ytVideos.reduce(function (previousPromise, item) {
       if (!item.has_card) {
         return Promise.resolve();
       }

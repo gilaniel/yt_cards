@@ -22,7 +22,8 @@ export default function() {
   const templates = {
     IDS: [],
     MESSAGES: [],
-    TEASERS: []
+    TEASERS: [],
+    COPY_IDS: []
   }
 
   checkUser();
@@ -194,6 +195,7 @@ export default function() {
           .twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content
           .sectionListRenderer.contents[0].itemSectionRenderer.contents[0]
           .playlistVideoListRenderer.contents;
+          
 
         clearVideoCount = topPlVideos.length;
 
@@ -212,7 +214,9 @@ export default function() {
         Promise.all(promiseArr).then((results)=>{
           loadOff();
 
-          $(".js-all-count").text(ytVideos.concat(topPlVideos).length);
+          ytVideos = ytVideos.concat(topPlVideos);
+
+          $(".js-all-count").text(ytVideos.length);
         });
       }
     );
@@ -244,37 +248,52 @@ export default function() {
     promiseArr.push(videoPromise);
   }
 
-  function setCard(videos) {
+  function setCard(videos, allVideos) {
     return new Promise((resolve, reject) => {
 
       videos.forEach((item, idx, array) => {
         chrome.runtime.sendMessage(
           { action: "set_card", v: item.video.playlistVideoRenderer.videoId, params: item.params },
           (response) => {
-            const lastError = chrome.runtime.lastError;
   
             localStorageSetItem('IDS', item.params.video_item_id);
             localStorageSetItem('MESSAGES', item.params.custom_message);
             localStorageSetItem('TEASERS', item.params.teaser_text);
   
-            if (lastError || response.error) {
+            if (response.error) {
               console.log(response);
               reject();
               
               return;
             }
-  
-            const allVideos = ytVideos.concat(topPlVideos);
-            
+
+            const video = ytVideos.find(function(element) {
+              return element.playlistVideoRenderer.videoId == item.video.playlistVideoRenderer.videoId;
+            });
+
+            const templates = response
+                .split('response">')[1]
+                .split("</textarea>")[0];
+
+            video["cards"] = JSON.parse(templates).feature_templates;
+
+            doneVideoCount++;
+
+            console.log(doneVideoCount);
+            console.log('allvideos - '+allVideos.length);
+
+            $('.progress-bar-fill').css('width',100 * (doneVideoCount) / allVideos.length + '%');
+
             if (idx === array.length -1) {
               console.log('done');
               resolve();
             }
             
+            
             // if (idx === links.length - 1) {
             //   doneVideoCount ++;
   
-            //   $('.progress-bar-fill').css('width',100 * (doneVideoCount) / allVideos.length + '%');
+            //   $('.progress-bar-fill').css('width',100 * (doneVideoCount) / ytVideos.length + '%');
               
             //   let templates = response
             //     .split('response">')[1]
@@ -294,45 +313,42 @@ export default function() {
     promiseArr.push(videoPromise);
   }
 
-  function clearCard(options) {
-    const {videoData, video, set} = options;
-    return new Promise(mainResolve => {
-      const setCardRequest = (item, idx) => {
+  function clearCard(videos) {
+    return new Promise(resolve => {
+      videos.forEach((item, idx, array) => {
         let params = {
           key: item.key,
-          // type: item.type,
-          // start_ms: item.start_ms,
-          // show_warnings: true,
-          // video_item_id: item.video_id,
-          // video_url: "",
-          // channel_url: item.channel_url,
-          // custom_message: item.custom_message,
-          // teaser_text: item.teaser_text,
           session_token: getCookie(cookie_name + channelId)
         };
 
-        return new Promise(resolve => {
-          chrome.runtime.sendMessage(
-            { action: "clear_card", v: videoData.videoId, params: params },
-            () => {
-              resolve();
-
-              if (idx === video.cards.length - 1) {
-                delete video["has_card"];
-
-                set ? setCard(videoData, video, mainResolve) : mainResolve();
-              }
+        chrome.runtime.sendMessage(
+          { action: "clear_card", v: item.id, params: params },
+          (response) => {
+            if (response.error) {
+              console.log(response);
+              reject();
+              
+              return;
             }
-          );
-        });
-      };
 
-      video.cards.reduce((previousPromise, item, idx) => {
-        return previousPromise.then(() => {
-          return setCardRequest(item, idx);
-        });
-      }, Promise.resolve());
+            const video = ytVideos.find(function(element) {
+              return element.playlistVideoRenderer.videoId == item.id;
+            });
+
+            video["cards"] = response.feature_templates;
+
+            if (idx === array.length - 1) {
+
+              resolve();
+            }
+          }
+        );
+      });
     });
+  }
+
+  function find() {
+
   }
 
   function copyCards(videoId) {
@@ -342,6 +358,7 @@ export default function() {
       { action: "check_card", v: videoId },
       (response) => {
         if (
+          response.feature_templates &&
           response.feature_templates.length &&
           response.feature_templates[0].key
         ) {
@@ -349,8 +366,15 @@ export default function() {
 
           fillCards();
 
-          loadOff();
+          localStorageSetItem('COPY_IDS', videoId);
+
+          getTemplates();
+
+        }else{
+          alert('Bad Video Id: ' + videoId);
         }
+
+        loadOff();
       });
   }
 
@@ -388,6 +412,7 @@ export default function() {
     templates.IDS = localStorageGetItem('IDS') || [];
     templates.MESSAGES = localStorageGetItem('MESSAGES') || [];
     templates.TEASERS = localStorageGetItem('TEASERS') || [];
+    templates.COPY_IDS = localStorageGetItem('COPY_IDS') || [];
 
     $('.list-content').html('');
 
@@ -402,6 +427,66 @@ export default function() {
     templates.TEASERS.forEach((item) => {
       $('.teasers-list').append(listItemTmp(item));
     });
+
+    templates.COPY_IDS.forEach((item) => {
+      $('.copy-ids-list').append(listItemTmp(item));
+    });
+  }
+
+  function getParams(links, item, i) {
+    const messages = [];
+    const teasers = [];
+
+    $(".custom_message").each((idx, item) => {
+      messages.push(item.value ? item.value : '');
+    });
+    
+    $(".teaser_text").each((idx, item) => {
+      teasers.push(item.value ? item.value : '');
+    });
+
+    let videoData = item.playlistVideoRenderer;
+
+    let params = {
+      key: "",
+      type: "video",
+      start_ms: 30000,
+      show_warnings: true,
+      video_item_id: "",
+      video_url: "",
+      custom_message: "",
+      teaser_text: "",
+      session_token: getCookie(cookie_name + channelId)
+    };
+
+    let lengthStep = 120 * 1000;
+
+    if (videoData.lengthSeconds < 600) {
+      lengthStep = Math.round((videoData.lengthSeconds / 6) * 1000);
+      params.start_ms = lengthStep;
+    }
+
+    if (links[i].indexOf('youtube') > -1) {
+      delete params.action_create_video;
+      params['action_create_collaborator'] = 1;
+      params['channel_url'] = links[i];
+      params['type'] = 'collaborator';
+    }else {
+      delete params.channel_url;
+      delete params.action_create_collaborator;
+      params['action_create_video'] = 1;
+      params['type'] = 'video';
+    }
+    
+    params.video_item_id = links[i];
+    params.custom_message = messages[i];
+    params.teaser_text = teasers[i];
+
+    if (i > 0) {
+      params.start_ms += lengthStep;
+    }
+
+    return params;
   }
 
   // SET CARDS
@@ -416,103 +501,91 @@ export default function() {
       }
     });
 
-    if (!links.length) return;
+    if (!links.length || $('.b-input-error').length) return;
+
+    $('.progress-bar').addClass('_show');
+    $('.progress-bar-fill').css('width', 0 + '%');
 
     doneVideoCount = 0;
 
-    const sendArray = [];
+    const clearArray = [];
+    const filledArray = [];
+    const filledArrayToClear = [];
 
     for (let i = 0; i < links.length; i++) {
-      topPlVideos.concat(ytVideos.slice(0,5)).forEach((item,idx) => {
-        const messages = [];
-        const teasers = [];
-  
-        $(".custom_message").each((idx, item) => {
-          messages.push(item.value ? item.value : '');
-        });
-        
-        $(".teaser_text").each((idx, item) => {
-          teasers.push(item.value ? item.value : '');
-        });
+      ytVideos.slice(0,5).forEach((item,idx) => {
+        const params = getParams(links, item, i);
 
-        let videoData = item.playlistVideoRenderer;
-
-        let params = {
-          key: "",
-          type: "video",
-          start_ms: 30000,
-          show_warnings: true,
-          video_item_id: "",
-          video_url: "",
-          custom_message: "",
-          teaser_text: "",
-          session_token: getCookie(cookie_name + channelId)
-        };
-  
-        let lengthStep = 120 * 1000;
-  
-        if (videoData.lengthSeconds < 600) {
-          lengthStep = Math.round((videoData.lengthSeconds / 6) * 1000);
-          params.start_ms = lengthStep;
-        }
-
-        if (links[i].indexOf('youtube') > -1) {
-          delete params.action_create_video;
-          params['action_create_collaborator'] = 1;
-          params['channel_url'] = links[i];
-          params['type'] = 'collaborator';
-        }else {
-          delete params.channel_url;
-          delete params.action_create_collaborator;
-          params['action_create_video'] = 1;
-          params['type'] = 'video';
-        }
-        
-        params.video_item_id = links[i];
-        params.custom_message = messages[i];
-        params.teaser_text = teasers[i];
-
-        if (i > 0) {
-          params.start_ms += lengthStep;
-        }
-
-        sendArray.push({video: item, params: params});
+        clearArray.push({video: item, params: params});
       });
     }
 
-    let size = 10;
-    let subarray = [];
+    ytVideos.slice(0,5).forEach((item,idx) => {
+      if (item.cards.length) {
+        filledArray.push(item)
+      }
+    });
     
-    for (let i = 0; i <Math.ceil(sendArray.length/size); i++){
-        subarray[i] = sendArray.slice((i*size), (i*size) + size);
+    for (let k = 0; k < 5; k++) {
+      filledArray.forEach((item, idx, array) => {
+        if (!item.cards[k]) return;
+
+        filledArrayToClear.push({id: item.playlistVideoRenderer.videoId, key: item.cards[k].key});
+      });
     }
-    
-    subarray.reduce((previousPromise, subItem) => {
-      return previousPromise.then(() => {
-        return setCard(subItem);
-      }).catch(() => {
-        console.log('error');
-      });
-    }, Promise.resolve());
-    
-    return; 
 
-    topPlVideos.concat(ytVideos.slice(0,5)).reduce((previousPromise, item) => {
-      return previousPromise.then(() => {
-        if (item.has_card) {
-          return clearCard({videoData: item.playlistVideoRenderer, video: item, set: true});
-        }
+    const size = 10;
+    const clearSubArray = [];
+    const filledSubArray = [];
+    
+    for (let i = 0; i <Math.ceil(clearArray.length/size); i++){
+      clearSubArray[i] = clearArray.slice((i*size), (i*size) + size);
+    }
 
-        return setCard(item.playlistVideoRenderer, item);
-      });
-    }, Promise.resolve());
+    for (let i = 0; i <Math.ceil(filledArrayToClear.length/size); i++){
+      filledSubArray[i] = filledArrayToClear.slice((i*size), (i*size) + size);
+    }
+
+    const setCardPromise = () => {
+      clearSubArray.reduce((previousPromise, subItem, idx, array) => {
+        return previousPromise.then(() => {
+          return setCard(subItem, clearArray).then(() => {
+            if (idx === array.length - 1) {
+              $('.progress-bar').removeClass('_show');
+
+              getTemplates();
+            }
+          });
+        }).catch(() => {
+          console.log('error');
+        });
+      }, Promise.resolve());
+    }
+
+    if (filledSubArray.length) {
+      filledSubArray.reduce((previousPromise, subItem, idx, array) => {
+        return previousPromise.then(() => {
+          return clearCard(subItem).then(() => {
+            if (idx === array.length - 1) {
+              setCardPromise();
+            }
+          });
+        }).catch(() => {
+          console.log('error');
+        });
+      }, Promise.resolve());
+
+      return;
+    }
+
+    setCardPromise();
   });
 
   // CLEAR CARDS
   $(".js-clear-card-btn").on("click", e => {
     e.preventDefault();
 
-    topPlVideos.concat(ytVideos).reduce((previousPromise, item) => {
+    ytVideos.reduce((previousPromise, item) => {
       if (!item.has_card) {
         return Promise.resolve();
       }

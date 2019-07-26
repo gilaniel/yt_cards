@@ -37,7 +37,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         sendResponse(resp);
       },
       error: function() {
-        sendResponse({ error: "error" });
+        sendResponse({ error: "error", videoId: request.v });
       }
     });
 
