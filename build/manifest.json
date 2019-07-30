@@ -29,6 +29,7 @@
         "http://dmitriy.api.yt-dev.1124.ru/*",
         "http://backoffice.kedoo.com/*",
         "http://backoffice2.kedoo.com/*",
+        "http://backoffice3.kedoo.com/*",
         "http://local.yt-api.com/*"
       ],
       "js": ["js/jquery.min.js", "js/notify.js", "content_scripts.js"],
@@ -44,6 +45,7 @@
     "http://dmitriy.api.yt-dev.1124.ru/",
     "http://backoffice.kedoo.com/",
     "http://backoffice2.kedoo.com/",
+    "http://backoffice3.kedoo.com/",
     "http://local.yt-api.com/",
     "tabs",
     "https://www.youtube.com/",
