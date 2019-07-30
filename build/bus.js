@@ -8,6 +8,13 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       .then(response => response.text())
       .then(text => sendResponse(text));
     return true;
+  } else if (request.action === "get_new_videos") {
+    url = `https://www.youtube.com/my_videos?o=U&ar=3&pi=${request.page}`;
+
+    fetch(url)
+      .then(response => response.text())
+      .then(text => sendResponse(text));
+    return true;
   } else if (request.action === "get_title") {
     url = `https://www.youtube.com/channel/${request.id}`;
 

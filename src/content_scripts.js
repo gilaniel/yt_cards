@@ -3,8 +3,6 @@ import { loadOff } from "./helpers";
 import { getCookie } from "./helpers";
 import { localStorageSetItem } from "./helpers";
 import { localStorageGetItem } from "./helpers";
-import { showPopup } from "./helpers";
-import { hidePopup } from "./helpers";
 
 function listItemTmp (item) {
   return `<div class="js-list-item">${item}</div>`;
@@ -15,19 +13,19 @@ export default function() {
   const ch_id_name = "tools_channel_id";
   let channelId = "";
   let topPlVideos = [];
+  let newVideos = [];
   let ytVideos = [];
   let cardsTemplates = [];
-  let clearVideoCount = 0;
   let doneVideoCount = 0;
   const templates = {
     IDS: [],
     MESSAGES: [],
     TEASERS: [],
-    COPY_IDS: []
+    COPY_IDS: [],
+    PL_IDS: []
   }
 
   checkUser();
-
 
   function checkUser() {
 
@@ -43,10 +41,11 @@ export default function() {
   }
 
   function getChannelId(response) {
-    var parser = new DOMParser();
-    var doc = parser.parseFromString(response, "text/html");
-    var elArr = Array.prototype.slice.call(doc.getElementsByTagName("script"));
-    var sText = elArr.filter(function(el) {
+    const elArr = getYtScripts(response);
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(response, "text/html");
+
+    let sText = elArr.filter(function(el) {
       return el.textContent.indexOf("GUIDED_HELP") > -1;
     });
 
@@ -55,7 +54,7 @@ export default function() {
 			sText = JSON.parse(sText);
 			sText = JSON.parse(sText);
 
-			var serviceParams = sText.responseContext.serviceTrackingParams;
+			const serviceParams = sText.responseContext.serviceTrackingParams;
 
 			serviceParams.forEach(function(item) {
 				if (item.service === 'GUIDED_HELP') {
@@ -85,10 +84,6 @@ export default function() {
     } else {
       channelId = $(doc).find('.spf-link[title="Мой канал"]').attr('href') || $(doc).find('.spf-link[title="My channel"]').attr('href');
 			channelId = channelId.split('/channel/')[1];
-      // sText = elArr.filter(function(el) {
-      //   return el.textContent.indexOf("GAPI_HINT_PARAMS") > -1;
-      // });
-      // channelId = /creator_channel_id":"([^"]+)"/.exec(sText[0].textContent)[1];
     }
 
     checkAuthState(elArr, channelId);
@@ -110,7 +105,7 @@ export default function() {
 
         $(".channel-title").html(title);
 
-        getNewVideos();
+        getNewVideos(1);
 
         // loadOff();
       }
@@ -118,7 +113,7 @@ export default function() {
   }
 
   function checkAuthState(scripts, channelId) {
-    var tagText = scripts.filter(function(el) {
+    let tagText = scripts.filter(function(el) {
       return el.textContent.indexOf("GAPI_HINT_PARAMS") > -1;
     });
 
@@ -128,7 +123,7 @@ export default function() {
       return false;
     }
 
-    var auth_token = "";
+    let auth_token = "";
     if (tagText[0].textContent.indexOf('"XSRF_TOKEN"') > -1) {
       auth_token = /XSRF_TOKEN":"([^"]+)"/.exec(tagText[0].textContent)[1];
     } else {
@@ -147,77 +142,131 @@ export default function() {
     localStorage.setItem(ch_id_name, channelId);
   }
 
-  function getNewVideos() {
-    $.get('/admin/cards?channel_id=' + channelId).then(function(payload) {
-      const promiseArr = [];
+  function getNewVideos(page) {
+    loadOn();
 
-      clearVideoCount += payload.data.videos.length;
+    const promiseArr = [];
 
-      payload.data.videos.forEach(item => {
-        let video = {
-          playlistVideoRenderer: {
-            videoId: item[0],
-            lengthSeconds: item[1]
+    chrome.runtime.sendMessage(
+      { action: "get_new_videos", page: page },
+      response => {
+        const elArr = getYtScripts(response);
+        const parser = new DOMParser();
+
+        const sText = elArr.filter(function(el) {
+          return el.textContent.indexOf("VIDEO_LIST_DISPLAY_OBJECT") > -1;
+        });
+        
+        let elements = sText[0].textContent.split('VIDEO_LIST_DISPLAY_OBJECT":')[1].split('}]')[0]+'}]';
+        elements = JSON.parse(elements);
+
+        elements.forEach((item) => {
+          const id = item.id;
+          item = parser.parseFromString(item.html, "text/html");
+          let time = $(item).find('.video-time').text().split(':');
+
+          if (!time) return;
+
+          if (time.length > 2) {
+            time = +(time[0]) * 60 * 60 + +(time[1]) * 60 + +(time[2]);
+          }else{
+            time = +(time[0]) * 60 + +(time[1]);
           }
-        };
 
-        ytVideos.push(video);
+          newVideos.push([id, time]);
+        });
 
-        checkVideoCard(item[0], video, promiseArr);         
+        elements.length < 27 ? page = 3 : page ++;
+        
+        if (page <= 2) {
+          getNewVideos(page);
+        }
+
+        if (page === 3) {
+          newVideos = newVideos.splice(0,50);
+
+          newVideos.forEach(item => {
+            let video = {
+              playlistVideoRenderer: {
+                videoId: item[0],
+                lengthSeconds: item[1]
+              }
+            };
+    
+            ytVideos.push(video);
+    
+            checkVideoCard(item[0], video, promiseArr);         
+          });
+
+          Promise.all(promiseArr).then((results)=>{
+            loadOff();
+
+            $(".js-all-count").text(newVideos.length);
+          });
+        }
+
       });
-
-      Promise.all(promiseArr).then((results)=>{
-        loadOff();
-        $(".js-all-count").text(ytVideos.concat(topPlVideos).length);
-      });
-    });
   }
 
   function getTopPlVideos(plId) {
     loadOn();
 
+    ytVideos = ytVideos.splice(0, newVideos.length - 1);
+
     chrome.runtime.sendMessage(
       { action: "get_pl_videos", plId: plId },
       response => {
-        var parser = new DOMParser();
-        var doc = parser.parseFromString(response, "text/html");
-        var elArr = Array.prototype.slice.call(
-          doc.getElementsByTagName("script")
-        );
-        var sText = elArr.filter(function(el) {
-          return el.textContent.indexOf("responseContext") > -1;
-        });
+        try {
+          const elArr = getYtScripts(response);
 
-        var ytData = sText[0].textContent
-          .split('window["ytInitialData"] = ')[1]
-          .split(";");
-        topPlVideos = JSON.parse(ytData[0]).contents
-          .twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content
-          .sectionListRenderer.contents[0].itemSectionRenderer.contents[0]
-          .playlistVideoListRenderer.contents;
-          
+          const sText = elArr.filter(function(el) {
+            return el.textContent.indexOf("responseContext") > -1;
+          });
+  
+          const ytData = sText[0].textContent
+            .split('window["ytInitialData"] = ')[1]
+            .split(";");
+          topPlVideos = JSON.parse(ytData[0]).contents
+            .twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content
+            .sectionListRenderer.contents[0].itemSectionRenderer.contents[0]
+            .playlistVideoListRenderer.contents;
+  
+          const promiseArr = [];
+          const videosArr = [];
+  
+          topPlVideos.forEach(item => {
+            const video = item.playlistVideoRenderer;
+            const findVideo = ytVideos.find(function(element) {
+              return element.playlistVideoRenderer.videoId == video.videoId;
+            });
 
-        clearVideoCount = topPlVideos.length;
+            if (findVideo || !video.lengthSeconds) { return; }
+  
+            videosArr.push(item);
+          });
 
-        const promiseArr = [];
+          videosArr.forEach(item => {
+            const video = item.playlistVideoRenderer;
 
-        topPlVideos.forEach(item => {
-          let video = item.playlistVideoRenderer;
+            checkVideoCard(video.videoId, item, promiseArr);   
+          });
 
-          if (video.lengthSeconds) {
-            checkVideoCard(video.videoId, item, promiseArr);         
-          } else{
-            clearVideoCount--;
-          }
-        });
+          Promise.all(promiseArr).then((results)=>{
+            loadOff();
+  
+            ytVideos = ytVideos.concat(videosArr);
+  
+            $('.js-playlist-count').text(videosArr.length);
+  
+            localStorageSetItem('PL_IDS', plId);
 
-        Promise.all(promiseArr).then((results)=>{
+            getTemplates();
+          });
+        }catch(e) {
           loadOff();
-
-          ytVideos = ytVideos.concat(topPlVideos);
-
-          $(".js-all-count").text(ytVideos.length);
-        });
+          
+          alert('Wrong Playlist or something else. Please contact Gila.');
+        }
       }
     );
   }
@@ -230,13 +279,13 @@ export default function() {
           item["cards"] = [];
 
           if (
+            response.feature_templates &&
             response.feature_templates.length &&
             response.feature_templates[0].key
           ) {
             item["has_card"] = true;
             item["cards"] = response.feature_templates;
           }
-
 
           $(".js-videos-count").removeClass("hide");
 
@@ -262,6 +311,8 @@ export default function() {
   
             if (response.error) {
               console.log(response);
+              $.notify({message: 'Set card error: ' + response.videoId},{type: 'danger'});
+
               reject();
               
               return;
@@ -279,32 +330,12 @@ export default function() {
 
             doneVideoCount++;
 
-            console.log(doneVideoCount);
-            console.log('allvideos - '+allVideos.length);
-
             $('.progress-bar-fill').css('width',100 * (doneVideoCount) / allVideos.length + '%');
 
             if (idx === array.length -1) {
               console.log('done');
               resolve();
             }
-            
-            
-            // if (idx === links.length - 1) {
-            //   doneVideoCount ++;
-  
-            //   $('.progress-bar-fill').css('width',100 * (doneVideoCount) / ytVideos.length + '%');
-              
-            //   let templates = response
-            //     .split('response">')[1]
-            //     .split("</textarea>")[0];
-  
-            //   video["cards"] = JSON.parse(templates).feature_templates;
-            //   video["has_card"] = true;
-  
-            //   getTemplates();
-              
-            // }
           }
         );
       });
@@ -314,7 +345,7 @@ export default function() {
   }
 
   function clearCard(videos) {
-    return new Promise(resolve => {
+    return new Promise((resolve, reject) => {
       videos.forEach((item, idx, array) => {
         let params = {
           key: item.key,
@@ -325,7 +356,8 @@ export default function() {
           { action: "clear_card", v: item.id, params: params },
           (response) => {
             if (response.error) {
-              console.log(response);
+              $.notify({message: 'Clear card error: ' + response.videoId},{type: 'danger'});
+
               reject();
               
               return;
@@ -338,7 +370,6 @@ export default function() {
             video["cards"] = response.feature_templates;
 
             if (idx === array.length - 1) {
-
               resolve();
             }
           }
@@ -347,8 +378,12 @@ export default function() {
     });
   }
 
-  function find() {
+  function getYtScripts(response) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(response, "text/html");
+    const elArr = Array.prototype.slice.call(doc.getElementsByTagName("script"));
 
+    return elArr;
   }
 
   function copyCards(videoId) {
@@ -413,23 +448,16 @@ export default function() {
     templates.MESSAGES = localStorageGetItem('MESSAGES') || [];
     templates.TEASERS = localStorageGetItem('TEASERS') || [];
     templates.COPY_IDS = localStorageGetItem('COPY_IDS') || [];
+    templates.PL_IDS = localStorageGetItem('PL_IDS') || [];
 
     $('.list-content').html('');
 
-    templates.IDS.forEach((item) => {
-      $('.ids-list').append(listItemTmp(item));
-    });
+    const lists = ['IDS', 'MESSAGES', 'TEASERS', 'COPY_IDS', 'PL_IDS'];
 
-    templates.MESSAGES.forEach((item) => {
-      $('.messages-list').append(listItemTmp(item));
-    });
-
-    templates.TEASERS.forEach((item) => {
-      $('.teasers-list').append(listItemTmp(item));
-    });
-
-    templates.COPY_IDS.forEach((item) => {
-      $('.copy-ids-list').append(listItemTmp(item));
+    lists.forEach((item) => {
+      templates[item].forEach((value) => {
+        $(`.${item.toLowerCase()}-list`).append(listItemTmp(value));
+      });
     });
   }
 
@@ -463,6 +491,7 @@ export default function() {
 
     if (videoData.lengthSeconds < 600) {
       lengthStep = Math.round((videoData.lengthSeconds / 6) * 1000);
+
       params.start_ms = lengthStep;
     }
 
@@ -483,7 +512,7 @@ export default function() {
     params.teaser_text = teasers[i];
 
     if (i > 0) {
-      params.start_ms += lengthStep;
+      params.start_ms += lengthStep * i;
     }
 
     return params;
@@ -513,14 +542,14 @@ export default function() {
     const filledArrayToClear = [];
 
     for (let i = 0; i < links.length; i++) {
-      ytVideos.slice(0,5).forEach((item,idx) => {
+      ytVideos.forEach((item,idx) => {
         const params = getParams(links, item, i);
 
         clearArray.push({video: item, params: params});
       });
     }
 
-    ytVideos.slice(0,5).forEach((item,idx) => {
+    ytVideos.forEach((item,idx) => {
       if (item.cards.length) {
         filledArray.push(item)
       }
@@ -534,7 +563,7 @@ export default function() {
       });
     }
 
-    const size = 10;
+    const size = 20;
     const clearSubArray = [];
     const filledSubArray = [];
     

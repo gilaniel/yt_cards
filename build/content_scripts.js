@@ -102,8 +102,6 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-
-
 function listItemTmp(item) {
   return "<div class=\"js-list-item\">".concat(item, "</div>");
 }
@@ -113,15 +111,16 @@ function listItemTmp(item) {
   var ch_id_name = "tools_channel_id";
   var channelId = "";
   var topPlVideos = [];
+  var newVideos = [];
   var ytVideos = [];
   var cardsTemplates = [];
-  var clearVideoCount = 0;
   var doneVideoCount = 0;
   var templates = {
     IDS: [],
     MESSAGES: [],
     TEASERS: [],
-    COPY_IDS: []
+    COPY_IDS: [],
+    PL_IDS: []
   };
   checkUser();
 
@@ -137,9 +136,9 @@ function listItemTmp(item) {
   }
 
   function getChannelId(response) {
+    var elArr = getYtScripts(response);
     var parser = new DOMParser();
     var doc = parser.parseFromString(response, "text/html");
-    var elArr = Array.prototype.slice.call(doc.getElementsByTagName("script"));
     var sText = elArr.filter(function (el) {
       return el.textContent.indexOf("GUIDED_HELP") > -1;
     });
@@ -173,10 +172,7 @@ function listItemTmp(item) {
       channelId = /creator_channel_id","value":"([^"]+)"/.exec(sText[0].textContent)[1];
     } else {
       channelId = $(doc).find('.spf-link[title="Мой канал"]').attr('href') || $(doc).find('.spf-link[title="My channel"]').attr('href');
-      channelId = channelId.split('/channel/')[1]; // sText = elArr.filter(function(el) {
-      //   return el.textContent.indexOf("GAPI_HINT_PARAMS") > -1;
-      // });
-      // channelId = /creator_channel_id":"([^"]+)"/.exec(sText[0].textContent)[1];
+      channelId = channelId.split('/channel/')[1];
     }
 
     checkAuthState(elArr, channelId);
@@ -198,7 +194,7 @@ function listItemTmp(item) {
       }
 
       $(".channel-title").html(title);
-      getNewVideos(); // loadOff();
+      getNewVideos(1); // loadOff();
     });
   }
 
@@ -230,57 +226,103 @@ function listItemTmp(item) {
     localStorage.setItem(ch_id_name, channelId);
   }
 
-  function getNewVideos() {
-    $.get('/admin/cards?channel_id=' + channelId).then(function (payload) {
-      var promiseArr = [];
-      clearVideoCount += payload.data.videos.length;
-      payload.data.videos.forEach(function (item) {
-        var video = {
-          playlistVideoRenderer: {
-            videoId: item[0],
-            lengthSeconds: item[1]
-          }
-        };
-        ytVideos.push(video);
-        checkVideoCard(item[0], video, promiseArr);
+  function getNewVideos(page) {
+    Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOn"])();
+    var promiseArr = [];
+    chrome.runtime.sendMessage({
+      action: "get_new_videos",
+      page: page
+    }, function (response) {
+      var elArr = getYtScripts(response);
+      var parser = new DOMParser();
+      var sText = elArr.filter(function (el) {
+        return el.textContent.indexOf("VIDEO_LIST_DISPLAY_OBJECT") > -1;
       });
-      Promise.all(promiseArr).then(function (results) {
-        Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOff"])();
-        $(".js-all-count").text(ytVideos.concat(topPlVideos).length);
+      var elements = sText[0].textContent.split('VIDEO_LIST_DISPLAY_OBJECT":')[1].split('}]')[0] + '}]';
+      elements = JSON.parse(elements);
+      elements.forEach(function (item) {
+        var id = item.id;
+        item = parser.parseFromString(item.html, "text/html");
+        var time = $(item).find('.video-time').text().split(':');
+        if (!time) return;
+
+        if (time.length > 2) {
+          time = +time[0] * 60 * 60 + +time[1] * 60 + +time[2];
+        } else {
+          time = +time[0] * 60 + +time[1];
+        }
+
+        newVideos.push([id, time]);
       });
+      elements.length < 27 ? page = 3 : page++;
+
+      if (page <= 2) {
+        getNewVideos(page);
+      }
+
+      if (page === 3) {
+        newVideos = newVideos.splice(0, 50);
+        newVideos.forEach(function (item) {
+          var video = {
+            playlistVideoRenderer: {
+              videoId: item[0],
+              lengthSeconds: item[1]
+            }
+          };
+          ytVideos.push(video);
+          checkVideoCard(item[0], video, promiseArr);
+        });
+        Promise.all(promiseArr).then(function (results) {
+          Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOff"])();
+          $(".js-all-count").text(newVideos.length);
+        });
+      }
     });
   }
 
   function getTopPlVideos(plId) {
     Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOn"])();
+    ytVideos = ytVideos.splice(0, newVideos.length - 1);
     chrome.runtime.sendMessage({
       action: "get_pl_videos",
       plId: plId
     }, function (response) {
-      var parser = new DOMParser();
-      var doc = parser.parseFromString(response, "text/html");
-      var elArr = Array.prototype.slice.call(doc.getElementsByTagName("script"));
-      var sText = elArr.filter(function (el) {
-        return el.textContent.indexOf("responseContext") > -1;
-      });
-      var ytData = sText[0].textContent.split('window["ytInitialData"] = ')[1].split(";");
-      topPlVideos = JSON.parse(ytData[0]).contents.twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].itemSectionRenderer.contents[0].playlistVideoListRenderer.contents;
-      clearVideoCount = topPlVideos.length;
-      var promiseArr = [];
-      topPlVideos.forEach(function (item) {
-        var video = item.playlistVideoRenderer;
+      try {
+        var elArr = getYtScripts(response);
+        var sText = elArr.filter(function (el) {
+          return el.textContent.indexOf("responseContext") > -1;
+        });
+        var ytData = sText[0].textContent.split('window["ytInitialData"] = ')[1].split(";");
+        topPlVideos = JSON.parse(ytData[0]).contents.twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].itemSectionRenderer.contents[0].playlistVideoListRenderer.contents;
+        var _promiseArr = [];
+        var videosArr = [];
+        topPlVideos.forEach(function (item) {
+          var video = item.playlistVideoRenderer;
+          var findVideo = ytVideos.find(function (element) {
+            return element.playlistVideoRenderer.videoId == video.videoId;
+          });
 
-        if (video.lengthSeconds) {
-          checkVideoCard(video.videoId, item, promiseArr);
-        } else {
-          clearVideoCount--;
-        }
-      });
-      Promise.all(promiseArr).then(function (results) {
+          if (findVideo || !video.lengthSeconds) {
+            return;
+          }
+
+          videosArr.push(item);
+        });
+        videosArr.forEach(function (item) {
+          var video = item.playlistVideoRenderer;
+          checkVideoCard(video.videoId, item, _promiseArr);
+        });
+        Promise.all(_promiseArr).then(function (results) {
+          Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOff"])();
+          ytVideos = ytVideos.concat(videosArr);
+          $('.js-playlist-count').text(videosArr.length);
+          Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageSetItem"])('PL_IDS', plId);
+          getTemplates();
+        });
+      } catch (e) {
         Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOff"])();
-        ytVideos = ytVideos.concat(topPlVideos);
-        $(".js-all-count").text(ytVideos.length);
-      });
+        alert('Wrong Playlist or something else. Please contact Gila.');
+      }
     });
   }
 
@@ -292,7 +334,7 @@ function listItemTmp(item) {
       }, function (response) {
         item["cards"] = [];
 
-        if (response.feature_templates.length && response.feature_templates[0].key) {
+        if (response.feature_templates && response.feature_templates.length && response.feature_templates[0].key) {
           item["has_card"] = true;
           item["cards"] = response.feature_templates;
         }
@@ -318,6 +360,11 @@ function listItemTmp(item) {
 
           if (response.error) {
             console.log(response);
+            $.notify({
+              message: 'Set card error: ' + response.videoId
+            }, {
+              type: 'danger'
+            });
             reject();
             return;
           }
@@ -328,24 +375,12 @@ function listItemTmp(item) {
           var templates = response.split('response">')[1].split("</textarea>")[0];
           video["cards"] = JSON.parse(templates).feature_templates;
           doneVideoCount++;
-          console.log(doneVideoCount);
-          console.log('allvideos - ' + allVideos.length);
           $('.progress-bar-fill').css('width', 100 * doneVideoCount / allVideos.length + '%');
 
           if (idx === array.length - 1) {
             console.log('done');
             resolve();
-          } // if (idx === links.length - 1) {
-          //   doneVideoCount ++;
-          //   $('.progress-bar-fill').css('width',100 * (doneVideoCount) / ytVideos.length + '%');
-          //   let templates = response
-          //     .split('response">')[1]
-          //     .split("</textarea>")[0];
-          //   video["cards"] = JSON.parse(templates).feature_templates;
-          //   video["has_card"] = true;
-          //   getTemplates();
-          // }
-
+          }
         });
       });
     });
@@ -353,7 +388,7 @@ function listItemTmp(item) {
   }
 
   function clearCard(videos) {
-    return new Promise(function (resolve) {
+    return new Promise(function (resolve, reject) {
       videos.forEach(function (item, idx, array) {
         var params = {
           key: item.key,
@@ -365,7 +400,11 @@ function listItemTmp(item) {
           params: params
         }, function (response) {
           if (response.error) {
-            console.log(response);
+            $.notify({
+              message: 'Clear card error: ' + response.videoId
+            }, {
+              type: 'danger'
+            });
             reject();
             return;
           }
@@ -383,7 +422,12 @@ function listItemTmp(item) {
     });
   }
 
-  function find() {}
+  function getYtScripts(response) {
+    var parser = new DOMParser();
+    var doc = parser.parseFromString(response, "text/html");
+    var elArr = Array.prototype.slice.call(doc.getElementsByTagName("script"));
+    return elArr;
+  }
 
   function copyCards(videoId) {
     Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOn"])();
@@ -430,18 +474,13 @@ function listItemTmp(item) {
     templates.MESSAGES = Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageGetItem"])('MESSAGES') || [];
     templates.TEASERS = Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageGetItem"])('TEASERS') || [];
     templates.COPY_IDS = Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageGetItem"])('COPY_IDS') || [];
+    templates.PL_IDS = Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageGetItem"])('PL_IDS') || [];
     $('.list-content').html('');
-    templates.IDS.forEach(function (item) {
-      $('.ids-list').append(listItemTmp(item));
-    });
-    templates.MESSAGES.forEach(function (item) {
-      $('.messages-list').append(listItemTmp(item));
-    });
-    templates.TEASERS.forEach(function (item) {
-      $('.teasers-list').append(listItemTmp(item));
-    });
-    templates.COPY_IDS.forEach(function (item) {
-      $('.copy-ids-list').append(listItemTmp(item));
+    var lists = ['IDS', 'MESSAGES', 'TEASERS', 'COPY_IDS', 'PL_IDS'];
+    lists.forEach(function (item) {
+      templates[item].forEach(function (value) {
+        $(".".concat(item.toLowerCase(), "-list")).append(listItemTmp(value));
+      });
     });
   }
 
@@ -490,7 +529,7 @@ function listItemTmp(item) {
     params.teaser_text = teasers[i];
 
     if (i > 0) {
-      params.start_ms += lengthStep;
+      params.start_ms += lengthStep * i;
     }
 
     return params;
@@ -514,7 +553,7 @@ function listItemTmp(item) {
     var filledArrayToClear = [];
 
     var _loop = function _loop(i) {
-      ytVideos.slice(0, 5).forEach(function (item, idx) {
+      ytVideos.forEach(function (item, idx) {
         var params = getParams(links, item, i);
         clearArray.push({
           video: item,
@@ -527,7 +566,7 @@ function listItemTmp(item) {
       _loop(i);
     }
 
-    ytVideos.slice(0, 5).forEach(function (item, idx) {
+    ytVideos.forEach(function (item, idx) {
       if (item.cards.length) {
         filledArray.push(item);
       }
@@ -547,7 +586,7 @@ function listItemTmp(item) {
       _loop2(k);
     }
 
-    var size = 10;
+    var size = 20;
     var clearSubArray = [];
     var filledSubArray = [];
 

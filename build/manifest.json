@@ -17,6 +17,7 @@
   "background": {
     "scripts": [
       "js/jquery.min.js",
+      "js/notify.js",
       "bus.js"
     ]
   },
@@ -30,12 +31,12 @@
         "http://backoffice2.kedoo.com/*",
         "http://local.yt-api.com/*"
       ],
-      "js": ["js/jquery.min.js", "content_scripts.js"],
+      "js": ["js/jquery.min.js", "js/notify.js", "content_scripts.js"],
       "run_at": "document_end"
     }
   ],
   "content_security_policy": "script-src 'self' https://www.youtube.com/iframe_api https://s.ytimg.com; object-src 'self'",
-  "web_accessible_resources": ["js/jquery.min.js"],
+  "web_accessible_resources": ["js/jquery.min.js", "js/notify.js"],
   "permissions": [
     "http://localhost/",
     "http://gila.api.yt-dev.1124.ru/",
