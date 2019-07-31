@@ -208,7 +208,7 @@ export default function() {
               mostViewedVideos = ytVideos;
 
               $('.js-most-videos-count').removeClass('hide');
-              $(".js-most-count").text(newVideos.length);
+              $(".js-most-count").text(mostViewedVideos.length);
             }else {
               newVideos = ytVideos;
               
