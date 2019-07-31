@@ -12,6 +12,7 @@ export default function() {
   const cookie_name = "tools_auth_token_";
   const ch_id_name = "tools_channel_id";
   let channelId = "";
+  let videos = [];
   let topPlVideos = [];
   let newVideos = [];
   let mostViewedVideos = [];
@@ -147,7 +148,6 @@ export default function() {
     loadOn();
 
     const promiseArr = [];
-    let videos = [];
     ytVideos = [];
 
     chrome.runtime.sendMessage(
@@ -681,6 +681,8 @@ export default function() {
   });
 
   $('.js-get-last').on('click', () => {
+    videos = [];
+
     getVideos(1);
   });
 
@@ -692,6 +694,8 @@ export default function() {
   });
 
   $('.js-get-most-viewed').on('click', () => {
+    videos = [];
+    
     getVideos(1, '&vmo=viewed&sa=0&sf=viewcount');
   });
 

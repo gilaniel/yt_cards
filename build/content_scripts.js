@@ -110,6 +110,7 @@ function listItemTmp(item) {
   var cookie_name = "tools_auth_token_";
   var ch_id_name = "tools_channel_id";
   var channelId = "";
+  var videos = [];
   var topPlVideos = [];
   var newVideos = [];
   var mostViewedVideos = [];
@@ -232,7 +233,6 @@ function listItemTmp(item) {
     var params = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
     Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOn"])();
     var promiseArr = [];
-    var videos = [];
     ytVideos = [];
     chrome.runtime.sendMessage({
       action: "get_new_videos",
@@ -697,6 +697,7 @@ function listItemTmp(item) {
     }
   });
   $('.js-get-last').on('click', function () {
+    videos = [];
     getVideos(1);
   });
   $('.js-get-list').on('click', function () {
@@ -705,6 +706,7 @@ function listItemTmp(item) {
     getTopPlVideos(plId);
   });
   $('.js-get-most-viewed').on('click', function () {
+    videos = [];
     getVideos(1, '&vmo=viewed&sa=0&sf=viewcount');
   });
   $('.js-copy-cards').on('click', function () {
