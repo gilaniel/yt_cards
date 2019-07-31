@@ -112,6 +112,7 @@ function listItemTmp(item) {
   var channelId = "";
   var topPlVideos = [];
   var newVideos = [];
+  var mostViewedVideos = [];
   var ytVideos = [];
   var cardsTemplates = [];
   var doneVideoCount = 0;
@@ -193,8 +194,9 @@ function listItemTmp(item) {
         title = doc.getElementsByTagName("title")[0].text;
       }
 
-      $(".channel-title").html(title);
-      getNewVideos(1); // loadOff();
+      $(".channel-title").html(title); // getVideos(1);
+
+      Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOff"])();
     });
   }
 
@@ -220,18 +222,22 @@ function listItemTmp(item) {
       auth_token = /XSRF_TOKEN': "([^"]+)"/.exec(tagText[0].textContent)[1];
     }
 
-    setCookie(channelId, auth_token); // getNewVideos();
+    setCookie(channelId, auth_token); // getVideos();
 
     getChannelTitle(channelId);
     localStorage.setItem(ch_id_name, channelId);
   }
 
-  function getNewVideos(page) {
+  function getVideos(page) {
+    var params = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
     Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOn"])();
     var promiseArr = [];
+    var videos = [];
+    ytVideos = [];
     chrome.runtime.sendMessage({
       action: "get_new_videos",
-      page: page
+      page: page,
+      params: params
     }, function (response) {
       var elArr = getYtScripts(response);
       var parser = new DOMParser();
@@ -252,17 +258,17 @@ function listItemTmp(item) {
           time = +time[0] * 60 + +time[1];
         }
 
-        newVideos.push([id, time]);
+        videos.push([id, time]);
       });
-      elements.length < 27 ? page = 3 : page++;
+      elements.length < 25 ? page = 3 : page++;
 
       if (page <= 2) {
-        getNewVideos(page);
+        getVideos(page, params);
       }
 
       if (page === 3) {
-        newVideos = newVideos.splice(0, 50);
-        newVideos.forEach(function (item) {
+        videos = videos.splice(0, 50);
+        videos.forEach(function (item) {
           var video = {
             playlistVideoRenderer: {
               videoId: item[0],
@@ -272,9 +278,18 @@ function listItemTmp(item) {
           ytVideos.push(video);
           checkVideoCard(item[0], video, promiseArr);
         });
-        Promise.all(promiseArr).then(function (results) {
+        Promise.all(promiseArr).then(function () {
           Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOff"])();
-          $(".js-all-count").text(newVideos.length);
+
+          if (params) {
+            mostViewedVideos = ytVideos;
+            $('.js-most-videos-count').removeClass('hide');
+            $(".js-most-count").text(newVideos.length);
+          } else {
+            newVideos = ytVideos;
+            $('.js-all-videos-count').removeClass('hide');
+            $(".js-all-count").text(newVideos.length);
+          }
         });
       }
     });
@@ -282,7 +297,7 @@ function listItemTmp(item) {
 
   function getTopPlVideos(plId) {
     Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOn"])();
-    ytVideos = ytVideos.splice(0, newVideos.length - 1);
+    ytVideos = [];
     chrome.runtime.sendMessage({
       action: "get_pl_videos",
       plId: plId
@@ -295,10 +310,9 @@ function listItemTmp(item) {
         var ytData = sText[0].textContent.split('window["ytInitialData"] = ')[1].split(";");
         topPlVideos = JSON.parse(ytData[0]).contents.twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].itemSectionRenderer.contents[0].playlistVideoListRenderer.contents;
         var _promiseArr = [];
-        var videosArr = [];
         topPlVideos.forEach(function (item) {
           var video = item.playlistVideoRenderer;
-          var findVideo = ytVideos.find(function (element) {
+          var findVideo = newVideos.find(function (element) {
             return element.playlistVideoRenderer.videoId == video.videoId;
           });
 
@@ -306,16 +320,18 @@ function listItemTmp(item) {
             return;
           }
 
-          videosArr.push(item);
+          ytVideos.push(item);
         });
-        videosArr.forEach(function (item) {
+        ytVideos.forEach(function (item) {
           var video = item.playlistVideoRenderer;
           checkVideoCard(video.videoId, item, _promiseArr);
         });
+        topPlVideos = ytVideos;
         Promise.all(_promiseArr).then(function (results) {
-          Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOff"])();
-          ytVideos = ytVideos.concat(videosArr);
-          $('.js-playlist-count').text(videosArr.length);
+          Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOff"])(); // ytVideos = ytVideos.concat(topPlVideos);
+
+          $('.js-pl-videos-count').removeClass('hide');
+          $('.js-playlist-count').text(topPlVideos.length);
           Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageSetItem"])('PL_IDS', plId);
           getTemplates();
         });
@@ -487,11 +503,15 @@ function listItemTmp(item) {
   function getParams(links, item, i) {
     var messages = [];
     var teasers = [];
+    var start_ms = [];
     $(".custom_message").each(function (idx, item) {
       messages.push(item.value ? item.value : '');
     });
     $(".teaser_text").each(function (idx, item) {
       teasers.push(item.value ? item.value : '');
+    });
+    $(".start_ms").each(function (idx, item) {
+      start_ms.push(item.value ? item.value : '');
     });
     var videoData = item.playlistVideoRenderer;
     var params = {
@@ -532,6 +552,18 @@ function listItemTmp(item) {
       params.start_ms += lengthStep * i;
     }
 
+    if (start_ms[i]) {
+      var time = start_ms[i].split(':');
+
+      if (time.length > 2) {
+        time = +time[0] * 60 * 60 + +time[1] * 60 + +time[2];
+      } else {
+        time = +time[0] * 60 + +time[1];
+      }
+
+      params.start_ms = time * 1000;
+    }
+
     return params;
   } // SET CARDS
 
@@ -547,6 +579,7 @@ function listItemTmp(item) {
     if (!links.length || $('.b-input-error').length) return;
     $('.progress-bar').addClass('_show');
     $('.progress-bar-fill').css('width', 0 + '%');
+    ytVideos = topPlVideos.concat(newVideos).concat(mostViewedVideos);
     doneVideoCount = 0;
     var clearArray = [];
     var filledArray = [];
@@ -663,15 +696,30 @@ function listItemTmp(item) {
 
     }
   });
+  $('.js-get-last').on('click', function () {
+    getVideos(1);
+  });
   $('.js-get-list').on('click', function () {
     var plId = $('.js-pl-id').val();
     if (!plId) return;
     getTopPlVideos(plId);
   });
+  $('.js-get-most-viewed').on('click', function () {
+    getVideos(1, '&vmo=viewed&sa=0&sf=viewcount');
+  });
   $('.js-copy-cards').on('click', function () {
     var videoId = $('.js-video-id').val();
     if (!videoId) return;
     copyCards(videoId);
+  });
+  $('#pl-only').on('change', function (e) {
+    var checked = $(e.currentTarget).prop('checked');
+
+    if (checked) {
+      ytVideos = topPlVideos;
+    } else {
+      ytVideos = newVideos.concat(topPlVideos);
+    }
   });
 });
 

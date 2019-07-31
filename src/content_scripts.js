@@ -14,6 +14,7 @@ export default function() {
   let channelId = "";
   let topPlVideos = [];
   let newVideos = [];
+  let mostViewedVideos = [];
   let ytVideos = [];
   let cardsTemplates = [];
   let doneVideoCount = 0;
@@ -105,9 +106,9 @@ export default function() {
 
         $(".channel-title").html(title);
 
-        getNewVideos(1);
+        // getVideos(1);
 
-        // loadOff();
+        loadOff();
       }
     );
   }
@@ -135,20 +136,22 @@ export default function() {
 
     setCookie(channelId, auth_token);
 
-    // getNewVideos();
+    // getVideos();
 
     getChannelTitle(channelId);
 
     localStorage.setItem(ch_id_name, channelId);
   }
 
-  function getNewVideos(page) {
+  function getVideos(page, params = '') {
     loadOn();
 
     const promiseArr = [];
+    let videos = [];
+    ytVideos = [];
 
     chrome.runtime.sendMessage(
-      { action: "get_new_videos", page: page },
+      { action: "get_new_videos", page: page, params: params },
       response => {
         const elArr = getYtScripts(response);
         const parser = new DOMParser();
@@ -173,19 +176,19 @@ export default function() {
             time = +(time[0]) * 60 + +(time[1]);
           }
 
-          newVideos.push([id, time]);
+          videos.push([id, time]);
         });
 
-        elements.length < 27 ? page = 3 : page ++;
+        elements.length < 25 ? page = 3 : page ++;
         
         if (page <= 2) {
-          getNewVideos(page);
+          getVideos(page, params);
         }
 
         if (page === 3) {
-          newVideos = newVideos.splice(0,50);
+          videos = videos.splice(0,50);
 
-          newVideos.forEach(item => {
+          videos.forEach(item => {
             let video = {
               playlistVideoRenderer: {
                 videoId: item[0],
@@ -198,10 +201,20 @@ export default function() {
             checkVideoCard(item[0], video, promiseArr);         
           });
 
-          Promise.all(promiseArr).then((results)=>{
+          Promise.all(promiseArr).then(()=>{
             loadOff();
 
-            $(".js-all-count").text(newVideos.length);
+            if (params) {
+              mostViewedVideos = ytVideos;
+
+              $('.js-most-videos-count').removeClass('hide');
+              $(".js-most-count").text(newVideos.length);
+            }else {
+              newVideos = ytVideos;
+              
+              $('.js-all-videos-count').removeClass('hide');
+              $(".js-all-count").text(newVideos.length);
+            }
           });
         }
 
@@ -211,7 +224,7 @@ export default function() {
   function getTopPlVideos(plId) {
     loadOn();
 
-    ytVideos = ytVideos.splice(0, newVideos.length - 1);
+    ytVideos = [];
 
     chrome.runtime.sendMessage(
       { action: "get_pl_videos", plId: plId },
@@ -232,31 +245,33 @@ export default function() {
             .playlistVideoListRenderer.contents;
   
           const promiseArr = [];
-          const videosArr = [];
   
           topPlVideos.forEach(item => {
             const video = item.playlistVideoRenderer;
-            const findVideo = ytVideos.find(function(element) {
+            const findVideo = newVideos.find(function(element) {
               return element.playlistVideoRenderer.videoId == video.videoId;
             });
 
             if (findVideo || !video.lengthSeconds) { return; }
   
-            videosArr.push(item);
+            ytVideos.push(item);
           });
 
-          videosArr.forEach(item => {
+          ytVideos.forEach(item => {
             const video = item.playlistVideoRenderer;
 
             checkVideoCard(video.videoId, item, promiseArr);   
           });
 
+          topPlVideos = ytVideos;
+
           Promise.all(promiseArr).then((results)=>{
             loadOff();
   
-            ytVideos = ytVideos.concat(videosArr);
-  
-            $('.js-playlist-count').text(videosArr.length);
+            // ytVideos = ytVideos.concat(topPlVideos);
+            
+            $('.js-pl-videos-count').removeClass('hide');
+            $('.js-playlist-count').text(topPlVideos.length);
   
             localStorageSetItem('PL_IDS', plId);
 
@@ -347,6 +362,7 @@ export default function() {
   function clearCard(videos) {
     return new Promise((resolve, reject) => {
       videos.forEach((item, idx, array) => {
+        
         let params = {
           key: item.key,
           session_token: getCookie(cookie_name + channelId)
@@ -464,6 +480,7 @@ export default function() {
   function getParams(links, item, i) {
     const messages = [];
     const teasers = [];
+    const start_ms = [];
 
     $(".custom_message").each((idx, item) => {
       messages.push(item.value ? item.value : '');
@@ -471,6 +488,10 @@ export default function() {
     
     $(".teaser_text").each((idx, item) => {
       teasers.push(item.value ? item.value : '');
+    });
+
+    $(".start_ms").each((idx, item) => {
+      start_ms.push(item.value ? item.value : '');
     });
 
     let videoData = item.playlistVideoRenderer;
@@ -515,6 +536,18 @@ export default function() {
       params.start_ms += lengthStep * i;
     }
 
+    if (start_ms[i]) {
+      let time = start_ms[i].split(':');
+
+      if (time.length > 2) {
+        time = +(time[0]) * 60 * 60 + +(time[1]) * 60 + +(time[2]);
+      }else{
+        time = +(time[0]) * 60 + +(time[1]);
+      }
+
+      params.start_ms = time * 1000;
+    }
+
     return params;
   }
 
@@ -534,6 +567,8 @@ export default function() {
 
     $('.progress-bar').addClass('_show');
     $('.progress-bar-fill').css('width', 0 + '%');
+
+    ytVideos = topPlVideos.concat(newVideos).concat(mostViewedVideos);
 
     doneVideoCount = 0;
 
@@ -645,11 +680,19 @@ export default function() {
     }
   });
 
+  $('.js-get-last').on('click', () => {
+    getVideos(1);
+  });
+
   $('.js-get-list').on('click', () => {
     var plId = $('.js-pl-id').val();
     if (!plId) return;
 
     getTopPlVideos(plId);
+  });
+
+  $('.js-get-most-viewed').on('click', () => {
+    getVideos(1, '&vmo=viewed&sa=0&sf=viewcount');
   });
 
   $('.js-copy-cards').on('click', () => {
@@ -658,5 +701,15 @@ export default function() {
     if (!videoId) return;
 
     copyCards(videoId);
+  });
+
+  $('#pl-only').on('change', (e) => {
+    const checked = $(e.currentTarget).prop('checked');
+
+    if (checked) {
+      ytVideos = topPlVideos;
+    }else {
+      ytVideos = newVideos.concat(topPlVideos);
+    }
   });
 }
