@@ -500,6 +500,16 @@ function listItemTmp(item) {
     });
   }
 
+  function refresh() {
+    videos = [];
+    topPlVideos = [];
+    newVideos = [];
+    mostViewedVideos = [];
+    ytVideos = [];
+    $('.b-input-x').val('');
+    $('.js-video-count').addClass('hide');
+  }
+
   function getParams(links, item, i) {
     var messages = [];
     var teasers = [];
@@ -722,6 +732,9 @@ function listItemTmp(item) {
     } else {
       ytVideos = newVideos.concat(topPlVideos);
     }
+  });
+  $('.js-refresh-btn').on('click', function () {
+    refresh();
   });
 });
 

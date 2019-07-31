@@ -477,6 +477,17 @@ export default function() {
     });
   }
 
+  function refresh() {
+    videos = [];
+    topPlVideos = [];
+    newVideos = [];
+    mostViewedVideos = [];
+    ytVideos = [];
+
+    $('.b-input-x').val('');
+    $('.js-video-count').addClass('hide');
+  }
+
   function getParams(links, item, i) {
     const messages = [];
     const teasers = [];
@@ -695,7 +706,7 @@ export default function() {
 
   $('.js-get-most-viewed').on('click', () => {
     videos = [];
-    
+
     getVideos(1, '&vmo=viewed&sa=0&sf=viewcount');
   });
 
@@ -715,5 +726,9 @@ export default function() {
     }else {
       ytVideos = newVideos.concat(topPlVideos);
     }
+  });
+
+  $('.js-refresh-btn').on('click', () => {
+    refresh();
   });
 }
