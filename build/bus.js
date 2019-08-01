@@ -9,7 +9,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       .then(text => sendResponse(text));
     return true;
   } else if (request.action === "get_new_videos") {
-    url = `https://www.youtube.com/my_videos?o=U&ar=3&pi=${request.page}${request.params}`;
+    url = `https://www.youtube.com/my_videos?o=U&ar=1564641111111&pi=${request.page}${request.params}`;
 
     fetch(url)
       .then(response => response.text())
