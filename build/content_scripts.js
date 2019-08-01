@@ -117,6 +117,10 @@ function listItemTmp(item) {
   var ytVideos = [];
   var cardsTemplates = [];
   var doneVideoCount = 0;
+  var client = {
+    version: '',
+    apiKey: ''
+  };
   var templates = {
     IDS: [],
     MESSAGES: [],
@@ -125,6 +129,33 @@ function listItemTmp(item) {
     PL_IDS: []
   };
   checkUser();
+
+  function studio() {
+    chrome.runtime.sendMessage({
+      action: "studio"
+    }, function (response) {
+      var elArr = getYtScripts(response);
+      var sText = elArr.filter(function (el) {
+        return el.textContent.indexOf("var ytcfg") > -1;
+      });
+
+      if (sText[0].textContent.indexOf('INNERTUBE_CONTEXT_CLIENT_VERSION') > -1) {
+        client.version = /INNERTUBE_CONTEXT_CLIENT_VERSION":"([^"]+)"/.exec(sText[0].textContent)[1];
+      }
+
+      if (sText[0].textContent.indexOf('INNERTUBE_API_KEY') > -1) {
+        client.version = /INNERTUBE_API_KEY":"([^"]+)"/.exec(sText[0].textContent)[1];
+      }
+
+      getStudioVideos();
+    });
+  }
+
+  function getStudioVideos() {
+    chrome.runtime.sendMessage({
+      action: "videos"
+    }, function (response) {});
+  }
 
   function checkUser() {
     Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOn"])();

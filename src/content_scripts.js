@@ -19,6 +19,12 @@ export default function() {
   let ytVideos = [];
   let cardsTemplates = [];
   let doneVideoCount = 0;
+
+  const client = {
+    version: '',
+    apiKey: ''
+  }
+
   const templates = {
     IDS: [],
     MESSAGES: [],
@@ -28,6 +34,31 @@ export default function() {
   }
 
   checkUser();
+
+  function studio() {
+    chrome.runtime.sendMessage({ action: "studio" }, response => {
+      const elArr = getYtScripts(response);
+      const sText = elArr.filter(function (el) {
+        return el.textContent.indexOf("var ytcfg") > -1;
+      });
+
+      if (sText[0].textContent.indexOf('INNERTUBE_CONTEXT_CLIENT_VERSION') > -1) {
+        client.version = /INNERTUBE_CONTEXT_CLIENT_VERSION":"([^"]+)"/.exec(sText[0].textContent)[1];
+      }
+
+      if (sText[0].textContent.indexOf('INNERTUBE_API_KEY') > -1) {
+        client.version = /INNERTUBE_API_KEY":"([^"]+)"/.exec(sText[0].textContent)[1];
+      }
+
+      getStudioVideos();
+    });
+  }
+
+  function getStudioVideos() {
+    chrome.runtime.sendMessage({ action: "videos" }, response => {
+    });
+    
+  }
 
   function checkUser() {
 
