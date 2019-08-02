@@ -633,6 +633,7 @@ export default function() {
     }
 
     const size = 20;
+    const deleteSize = 1;
     const clearSubArray = [];
     const filledSubArray = [];
     
@@ -640,8 +641,8 @@ export default function() {
       clearSubArray[i] = clearArray.slice((i*size), (i*size) + size);
     }
 
-    for (let i = 0; i <Math.ceil(filledArrayToClear.length/size); i++){
-      filledSubArray[i] = filledArrayToClear.slice((i*size), (i*size) + size);
+    for (let i = 0; i <Math.ceil(filledArrayToClear.length/deleteSize); i++){
+      filledSubArray[i] = filledArrayToClear.slice((i*deleteSize), (i*deleteSize) + deleteSize);
     }
 
     const setCardPromise = () => {

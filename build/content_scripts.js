@@ -653,6 +653,7 @@ function listItemTmp(item) {
     }
 
     var size = 20;
+    var deleteSize = 1;
     var clearSubArray = [];
     var filledSubArray = [];
 
@@ -660,8 +661,8 @@ function listItemTmp(item) {
       clearSubArray[i] = clearArray.slice(i * size, i * size + size);
     }
 
-    for (var _i = 0; _i < Math.ceil(filledArrayToClear.length / size); _i++) {
-      filledSubArray[_i] = filledArrayToClear.slice(_i * size, _i * size + size);
+    for (var _i = 0; _i < Math.ceil(filledArrayToClear.length / deleteSize); _i++) {
+      filledSubArray[_i] = filledArrayToClear.slice(_i * deleteSize, _i * deleteSize + deleteSize);
     }
 
     var setCardPromise = function setCardPromise() {
