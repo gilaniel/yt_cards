@@ -367,7 +367,8 @@ export default function() {
             video["cards"] = JSON.parse(templates).feature_templates;
 
             doneVideoCount++;
-
+            
+            $('.progress-bar span').text('Set cards');
             $('.progress-bar-fill').css('width',100 * (doneVideoCount) / allVideos.length + '%');
 
             if (idx === array.length -1) {
@@ -382,7 +383,7 @@ export default function() {
     promiseArr.push(videoPromise);
   }
 
-  function clearCard(videos) {
+  function clearCard(videos, allVideos) {
     return new Promise((resolve, reject) => {
       videos.forEach((item, idx, array) => {
         
@@ -407,6 +408,11 @@ export default function() {
             });
 
             video["cards"] = response.feature_templates;
+
+            doneVideoCount++;
+
+            $('.progress-bar span').text('Deleting cards');
+            $('.progress-bar-fill').css('width',100 * (doneVideoCount) / allVideos.length + '%');
 
             if (idx === array.length - 1) {
               resolve();
@@ -604,7 +610,7 @@ export default function() {
 
     ytVideos = topPlVideos.concat(newVideos).concat(mostViewedVideos);
 
-    doneVideoCount = 0;
+    
 
     const clearArray = [];
     const filledArray = [];
@@ -632,7 +638,7 @@ export default function() {
       });
     }
 
-    const size = 20;
+    const size = 1;
     const deleteSize = 1;
     const clearSubArray = [];
     const filledSubArray = [];
@@ -646,6 +652,8 @@ export default function() {
     }
 
     const setCardPromise = () => {
+      doneVideoCount = 0;
+
       clearSubArray.reduce((previousPromise, subItem, idx, array) => {
         return previousPromise.then(() => {
           return setCard(subItem, clearArray).then(() => {
@@ -662,9 +670,11 @@ export default function() {
     }
 
     if (filledSubArray.length) {
+      doneVideoCount = 0;
+
       filledSubArray.reduce((previousPromise, subItem, idx, array) => {
         return previousPromise.then(() => {
-          return clearCard(subItem).then(() => {
+          return clearCard(subItem, filledArrayToClear).then(() => {
             if (idx === array.length - 1) {
               setCardPromise();
             }

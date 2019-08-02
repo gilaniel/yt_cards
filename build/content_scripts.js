@@ -414,6 +414,7 @@ function listItemTmp(item) {
           var templates = response.split('response">')[1].split("</textarea>")[0];
           video["cards"] = JSON.parse(templates).feature_templates;
           doneVideoCount++;
+          $('.progress-bar span').text('Set cards');
           $('.progress-bar-fill').css('width', 100 * doneVideoCount / allVideos.length + '%');
 
           if (idx === array.length - 1) {
@@ -426,7 +427,7 @@ function listItemTmp(item) {
     promiseArr.push(videoPromise);
   }
 
-  function clearCard(videos) {
+  function clearCard(videos, allVideos) {
     return new Promise(function (resolve, reject) {
       videos.forEach(function (item, idx, array) {
         var params = {
@@ -452,6 +453,9 @@ function listItemTmp(item) {
             return element.playlistVideoRenderer.videoId == item.id;
           });
           video["cards"] = response.feature_templates;
+          doneVideoCount++;
+          $('.progress-bar span').text('Deleting cards');
+          $('.progress-bar-fill').css('width', 100 * doneVideoCount / allVideos.length + '%');
 
           if (idx === array.length - 1) {
             resolve();
@@ -613,7 +617,6 @@ function listItemTmp(item) {
     $('.progress-bar').addClass('_show');
     $('.progress-bar-fill').css('width', 0 + '%');
     ytVideos = topPlVideos.concat(newVideos).concat(mostViewedVideos);
-    doneVideoCount = 0;
     var clearArray = [];
     var filledArray = [];
     var filledArrayToClear = [];
@@ -652,7 +655,7 @@ function listItemTmp(item) {
       _loop2(k);
     }
 
-    var size = 20;
+    var size = 1;
     var deleteSize = 1;
     var clearSubArray = [];
     var filledSubArray = [];
@@ -666,6 +669,7 @@ function listItemTmp(item) {
     }
 
     var setCardPromise = function setCardPromise() {
+      doneVideoCount = 0;
       clearSubArray.reduce(function (previousPromise, subItem, idx, array) {
         return previousPromise.then(function () {
           return setCard(subItem, clearArray).then(function () {
@@ -681,9 +685,10 @@ function listItemTmp(item) {
     };
 
     if (filledSubArray.length) {
+      doneVideoCount = 0;
       filledSubArray.reduce(function (previousPromise, subItem, idx, array) {
         return previousPromise.then(function () {
-          return clearCard(subItem).then(function () {
+          return clearCard(subItem, filledArrayToClear).then(function () {
             if (idx === array.length - 1) {
               setCardPromise();
             }
