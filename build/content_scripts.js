@@ -119,7 +119,8 @@ function listItemTmp(item) {
   var doneVideoCount = 0;
   var client = {
     version: '',
-    apiKey: ''
+    apiKey: '',
+    ar: ''
   };
   var templates = {
     IDS: [],
@@ -130,31 +131,20 @@ function listItemTmp(item) {
   };
   checkUser();
 
-  function studio() {
+  function getYtAr(channelId) {
     chrome.runtime.sendMessage({
-      action: "studio"
+      action: "get_yt_ar",
+      channelId: channelId
     }, function (response) {
       var elArr = getYtScripts(response);
       var sText = elArr.filter(function (el) {
         return el.textContent.indexOf("var ytcfg") > -1;
       });
 
-      if (sText[0].textContent.indexOf('INNERTUBE_CONTEXT_CLIENT_VERSION') > -1) {
-        client.version = /INNERTUBE_CONTEXT_CLIENT_VERSION":"([^"]+)"/.exec(sText[0].textContent)[1];
+      if (sText[0].textContent.indexOf('SERVER_MILLIS_SINCE_EPOCH') > -1) {
+        client.ar = /SERVER_MILLIS_SINCE_EPOCH":([^"]+),/.exec(sText[0].textContent)[1];
       }
-
-      if (sText[0].textContent.indexOf('INNERTUBE_API_KEY') > -1) {
-        client.version = /INNERTUBE_API_KEY":"([^"]+)"/.exec(sText[0].textContent)[1];
-      }
-
-      getStudioVideos();
     });
-  }
-
-  function getStudioVideos() {
-    chrome.runtime.sendMessage({
-      action: "videos"
-    }, function (response) {});
   }
 
   function checkUser() {
@@ -256,6 +246,7 @@ function listItemTmp(item) {
 
     setCookie(channelId, auth_token); // getVideos();
 
+    getYtAr(channelId);
     getChannelTitle(channelId);
     localStorage.setItem(ch_id_name, channelId);
   }
@@ -268,7 +259,8 @@ function listItemTmp(item) {
     chrome.runtime.sendMessage({
       action: "get_new_videos",
       page: page,
-      params: params
+      params: params,
+      ar: client.ar
     }, function (response) {
       var elArr = getYtScripts(response);
       var parser = new DOMParser();

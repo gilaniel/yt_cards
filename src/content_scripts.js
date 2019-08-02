@@ -22,7 +22,8 @@ export default function() {
 
   const client = {
     version: '',
-    apiKey: ''
+    apiKey: '',
+    ar: ''
   }
 
   const templates = {
@@ -35,29 +36,18 @@ export default function() {
 
   checkUser();
 
-  function studio() {
-    chrome.runtime.sendMessage({ action: "studio" }, response => {
+  function getYtAr(channelId) {
+    chrome.runtime.sendMessage({ action: "get_yt_ar", channelId: channelId }, response => {
       const elArr = getYtScripts(response);
       const sText = elArr.filter(function (el) {
         return el.textContent.indexOf("var ytcfg") > -1;
       });
 
-      if (sText[0].textContent.indexOf('INNERTUBE_CONTEXT_CLIENT_VERSION') > -1) {
-        client.version = /INNERTUBE_CONTEXT_CLIENT_VERSION":"([^"]+)"/.exec(sText[0].textContent)[1];
+      if (sText[0].textContent.indexOf('SERVER_MILLIS_SINCE_EPOCH') > -1) {
+        client.ar = /SERVER_MILLIS_SINCE_EPOCH":([^"]+),/.exec(sText[0].textContent)[1];
       }
 
-      if (sText[0].textContent.indexOf('INNERTUBE_API_KEY') > -1) {
-        client.version = /INNERTUBE_API_KEY":"([^"]+)"/.exec(sText[0].textContent)[1];
-      }
-
-      getStudioVideos();
     });
-  }
-
-  function getStudioVideos() {
-    chrome.runtime.sendMessage({ action: "videos" }, response => {
-    });
-    
   }
 
   function checkUser() {
@@ -170,6 +160,8 @@ export default function() {
 
     // getVideos();
 
+    getYtAr(channelId);
+
     getChannelTitle(channelId);
 
     localStorage.setItem(ch_id_name, channelId);
@@ -182,7 +174,7 @@ export default function() {
     ytVideos = [];
 
     chrome.runtime.sendMessage(
-      { action: "get_new_videos", page: page, params: params },
+      { action: "get_new_videos", page: page, params: params, ar: client.ar },
       response => {
         const elArr = getYtScripts(response);
         const parser = new DOMParser();
