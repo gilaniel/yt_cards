@@ -102,8 +102,9 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-function listItemTmp(item) {
-  return "<div class=\"js-list-item\">".concat(item, "</div>");
+function listItemTmp(item, error) {
+  var listClass = error ? 'error-list-item' : 'js-list-item';
+  return "<div class=\"".concat(listClass, "\">").concat(item, "</div>");
 }
 
 /* harmony default export */ __webpack_exports__["default"] = (function () {
@@ -253,6 +254,8 @@ function listItemTmp(item) {
 
   function getVideos(page) {
     var params = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : '';
+    $('.success-text').addClass('hidden');
+    $('.error-block').addClass('hidden');
     Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOn"])();
     var promiseArr = [];
     ytVideos = [];
@@ -272,6 +275,7 @@ function listItemTmp(item) {
       elements.forEach(function (item) {
         var id = item.id;
         item = parser.parseFromString(item.html, "text/html");
+        var title = $(item).find('.vm-video-title-content').text();
         var time = $(item).find('.video-time').text().split(':');
         if (!time) return;
 
@@ -281,7 +285,7 @@ function listItemTmp(item) {
           time = +time[0] * 60 + +time[1];
         }
 
-        videos.push([id, time]);
+        videos.push([id, time, title]);
       });
       elements.length < 25 ? page = 3 : page++;
 
@@ -295,7 +299,8 @@ function listItemTmp(item) {
           var video = {
             playlistVideoRenderer: {
               videoId: item[0],
-              lengthSeconds: item[1]
+              lengthSeconds: item[1],
+              title: item[2]
             }
           };
           ytVideos.push(video);
@@ -319,6 +324,7 @@ function listItemTmp(item) {
   }
 
   function getTopPlVideos(plId) {
+    $('.success-text').addClass('hidden');
     Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOn"])();
     ytVideos = [];
     chrome.runtime.sendMessage({
@@ -332,7 +338,7 @@ function listItemTmp(item) {
         });
         var ytData = sText[0].textContent.split('window["ytInitialData"] = ')[1].split(";");
         topPlVideos = JSON.parse(ytData[0]).contents.twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].itemSectionRenderer.contents[0].playlistVideoListRenderer.contents;
-        var _promiseArr = [];
+        var promiseArr = [];
         topPlVideos.forEach(function (item) {
           var video = item.playlistVideoRenderer;
           var findVideo = newVideos.find(function (element) {
@@ -347,10 +353,10 @@ function listItemTmp(item) {
         });
         ytVideos.forEach(function (item) {
           var video = item.playlistVideoRenderer;
-          checkVideoCard(video.videoId, item, _promiseArr);
+          checkVideoCard(video.videoId, item, promiseArr);
         });
         topPlVideos = ytVideos;
-        Promise.all(_promiseArr).then(function (results) {
+        Promise.all(promiseArr).then(function (results) {
           Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["loadOff"])(); // ytVideos = ytVideos.concat(topPlVideos);
 
           $('.js-pl-videos-count').removeClass('hide');
@@ -374,7 +380,6 @@ function listItemTmp(item) {
         item["cards"] = [];
 
         if (response.feature_templates && response.feature_templates.length && response.feature_templates[0].key) {
-          item["has_card"] = true;
           item["cards"] = response.feature_templates;
         }
 
@@ -396,35 +401,52 @@ function listItemTmp(item) {
           Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageSetItem"])('IDS', item.params.video_item_id);
           Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageSetItem"])('MESSAGES', item.params.custom_message);
           Object(_helpers__WEBPACK_IMPORTED_MODULE_0__["localStorageSetItem"])('TEASERS', item.params.teaser_text);
-
-          if (response.error) {
-            console.log(response);
-            $.notify({
-              message: 'Set card error: ' + response.videoId
-            }, {
-              type: 'danger'
-            });
-            reject();
-            return;
-          }
-
-          var video = ytVideos.find(function (element) {
-            return element.playlistVideoRenderer.videoId == item.video.playlistVideoRenderer.videoId;
-          });
-          var templates = response.split('response">')[1].split("</textarea>")[0];
-          video["cards"] = JSON.parse(templates).feature_templates;
           doneVideoCount++;
           $('.progress-bar span').text('Set cards');
           $('.progress-bar-fill').css('width', 100 * doneVideoCount / allVideos.length + '%');
+          var video = ytVideos.find(function (element) {
+            return element.playlistVideoRenderer.videoId == item.video.playlistVideoRenderer.videoId;
+          });
+
+          if (response.error) {
+            fillErrors({
+              error: 'Set card error:',
+              video: video
+            });
+            reject(response.videoId);
+            return;
+          }
+
+          response = JSON.parse(response.split('response">')[1].split("</textarea>")[0]);
+
+          if (response.errors) {
+            var error = '';
+
+            if (response.errors[0] === 'Invalid Request') {
+              error = response.form_errors[0].message;
+            } else {
+              for (var er in response.errors) {
+                if (response.errors[er].trim().length) {
+                  error = response.errors[er];
+                }
+              }
+            }
+
+            fillErrors({
+              error: error + ':',
+              video: video
+            });
+          } else {
+            delete video['error'];
+            video["cards"] = response.feature_templates;
+          }
 
           if (idx === array.length - 1) {
-            console.log('done');
             resolve();
           }
         });
       });
     });
-    promiseArr.push(videoPromise);
   }
 
   function clearCard(videos, allVideos) {
@@ -439,23 +461,23 @@ function listItemTmp(item) {
           v: item.id,
           params: params
         }, function (response) {
-          if (response.error) {
-            $.notify({
-              message: 'Clear card error: ' + response.videoId
-            }, {
-              type: 'danger'
-            });
-            reject();
-            return;
-          }
-
-          var video = ytVideos.find(function (element) {
-            return element.playlistVideoRenderer.videoId == item.id;
-          });
-          video["cards"] = response.feature_templates;
           doneVideoCount++;
           $('.progress-bar span').text('Deleting cards');
           $('.progress-bar-fill').css('width', 100 * doneVideoCount / allVideos.length + '%');
+          var video = ytVideos.find(function (element) {
+            return element.playlistVideoRenderer.videoId == item.id;
+          });
+
+          if (response.error) {
+            fillErrors({
+              error: 'Can\'t clear card:',
+              video: video
+            });
+            reject(response.videoId);
+            return;
+          }
+
+          video["cards"] = response.feature_templates;
 
           if (idx === array.length - 1) {
             resolve();
@@ -463,6 +485,12 @@ function listItemTmp(item) {
         });
       });
     });
+  }
+
+  function fillErrors(options) {
+    var video = options.video;
+    $('.error-block').removeClass('hidden');
+    $('.errors-list').append(listItemTmp("".concat(options.error, " ").concat(video.playlistVideoRenderer.title, " (").concat(video.playlistVideoRenderer.videoId, ")"), 'error'));
   }
 
   function getYtScripts(response) {
@@ -535,6 +563,9 @@ function listItemTmp(item) {
     ytVideos = [];
     $('.b-input-x').val('');
     $('.js-video-count').addClass('hide');
+    $('.error-block').addClass('hidden');
+    $('.success-text').addClass('hidden');
+    $('.errors-list').html('');
   }
 
   function getParams(links, item, i) {
@@ -569,7 +600,7 @@ function listItemTmp(item) {
       params.start_ms = lengthStep;
     }
 
-    if (links[i].indexOf('youtube') > -1) {
+    if (links[i].indexOf('user') > -1 || links[i].indexOf('channel') > -1) {
       delete params.action_create_video;
       params['action_create_collaborator'] = 1;
       params['channel_url'] = links[i];
@@ -610,12 +641,19 @@ function listItemTmp(item) {
     var links = [];
     $(".video_item_id").each(function (idx, item) {
       if (item.value) {
+        if (item.value.indexOf('/watch?v=') > -1) {
+          item.value = item.value.split('/watch?v=')[1];
+        }
+
         links.push(item.value);
       }
     });
     if (!links.length || $('.b-input-error').length) return;
     $('.progress-bar').addClass('_show');
     $('.progress-bar-fill').css('width', 0 + '%');
+    $('.success-text').addClass('hidden');
+    $('.error-block').addClass('hidden');
+    $('.errors-list').html('');
     ytVideos = topPlVideos.concat(newVideos).concat(mostViewedVideos);
     var clearArray = [];
     var filledArray = [];
@@ -675,16 +713,20 @@ function listItemTmp(item) {
           return setCard(subItem, clearArray).then(function () {
             if (idx === array.length - 1) {
               $('.progress-bar').removeClass('_show');
+              $('.success-text').removeClass('hidden');
               getTemplates();
             }
           });
-        })["catch"](function () {
-          console.log('error');
+        })["catch"](function (e) {
+          if (idx === array.length - 1) {
+            $('.progress-bar').removeClass('_show');
+            $('.success-text').removeClass('hidden');
+          }
         });
       }, Promise.resolve());
     };
 
-    if (filledSubArray.length) {
+    var clearCardPromise = function clearCardPromise() {
       doneVideoCount = 0;
       filledSubArray.reduce(function (previousPromise, subItem, idx, array) {
         return previousPromise.then(function () {
@@ -693,10 +735,16 @@ function listItemTmp(item) {
               setCardPromise();
             }
           });
-        })["catch"](function () {
-          console.log('error');
+        })["catch"](function (e) {
+          if (idx === array.length - 1) {
+            setCardPromise();
+          }
         });
       }, Promise.resolve());
+    };
+
+    if (filledSubArray.length) {
+      clearCardPromise();
       return;
     }
 

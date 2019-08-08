@@ -4,8 +4,10 @@ import { getCookie } from "./helpers";
 import { localStorageSetItem } from "./helpers";
 import { localStorageGetItem } from "./helpers";
 
-function listItemTmp (item) {
-  return `<div class="js-list-item">${item}</div>`;
+function listItemTmp (item, error) {
+  let listClass = error ? 'error-list-item' : 'js-list-item';
+
+  return `<div class="${listClass}">${item}</div>`;
 }
 
 export default function() {
@@ -168,6 +170,9 @@ export default function() {
   }
 
   function getVideos(page, params = '') {
+    $('.success-text').addClass('hidden');
+    $('.error-block').addClass('hidden');
+
     loadOn();
 
     const promiseArr = [];
@@ -189,6 +194,7 @@ export default function() {
         elements.forEach((item) => {
           const id = item.id;
           item = parser.parseFromString(item.html, "text/html");
+          const title = $(item).find('.vm-video-title-content').text();
           let time = $(item).find('.video-time').text().split(':');
 
           if (!time) return;
@@ -199,7 +205,7 @@ export default function() {
             time = +(time[0]) * 60 + +(time[1]);
           }
 
-          videos.push([id, time]);
+          videos.push([id, time, title]);
         });
 
         elements.length < 25 ? page = 3 : page ++;
@@ -215,7 +221,8 @@ export default function() {
             let video = {
               playlistVideoRenderer: {
                 videoId: item[0],
-                lengthSeconds: item[1]
+                lengthSeconds: item[1],
+                title: item[2]
               }
             };
     
@@ -245,6 +252,8 @@ export default function() {
   }
 
   function getTopPlVideos(plId) {
+    $('.success-text').addClass('hidden');
+
     loadOn();
 
     ytVideos = [];
@@ -321,7 +330,6 @@ export default function() {
             response.feature_templates.length &&
             response.feature_templates[0].key
           ) {
-            item["has_card"] = true;
             item["cards"] = response.feature_templates;
           }
 
@@ -346,33 +354,48 @@ export default function() {
             localStorageSetItem('IDS', item.params.video_item_id);
             localStorageSetItem('MESSAGES', item.params.custom_message);
             localStorageSetItem('TEASERS', item.params.teaser_text);
-  
-            if (response.error) {
-              console.log(response);
-              $.notify({message: 'Set card error: ' + response.videoId},{type: 'danger'});
-
-              reject();
-              
-              return;
-            }
-
-            const video = ytVideos.find(function(element) {
-              return element.playlistVideoRenderer.videoId == item.video.playlistVideoRenderer.videoId;
-            });
-
-            const templates = response
-                .split('response">')[1]
-                .split("</textarea>")[0];
-
-            video["cards"] = JSON.parse(templates).feature_templates;
 
             doneVideoCount++;
             
             $('.progress-bar span').text('Set cards');
             $('.progress-bar-fill').css('width',100 * (doneVideoCount) / allVideos.length + '%');
 
+            const video = ytVideos.find(function(element) {
+              return element.playlistVideoRenderer.videoId == item.video.playlistVideoRenderer.videoId;
+            });
+  
+            if (response.error) {
+              fillErrors({error: 'Set card error:', video: video});
+
+              reject(response.videoId);
+              
+              return;
+            }
+
+            response = JSON.parse(response
+                .split('response">')[1]
+                .split("</textarea>")[0]);
+
+            if (response.errors) {
+              let error = '';
+
+              if (response.errors[0] === 'Invalid Request') {
+                error = response.form_errors[0].message;
+              }else{
+                for (let er in response.errors) {
+                  if (response.errors[er].trim().length) {
+                    error = response.errors[er];
+                  }
+                }
+              }
+
+              fillErrors({error: error + ':', video: video});
+            }else{
+              delete video['error'];
+              video["cards"] = response.feature_templates;
+            }
+
             if (idx === array.length -1) {
-              console.log('done');
               resolve();
             }
           }
@@ -380,7 +403,6 @@ export default function() {
       });
     });
 
-    promiseArr.push(videoPromise);
   }
 
   function clearCard(videos, allVideos) {
@@ -395,24 +417,24 @@ export default function() {
         chrome.runtime.sendMessage(
           { action: "clear_card", v: item.id, params: params },
           (response) => {
-            if (response.error) {
-              $.notify({message: 'Clear card error: ' + response.videoId},{type: 'danger'});
+            doneVideoCount++;
 
-              reject();
-              
-              return;
-            }
+            $('.progress-bar span').text('Deleting cards');
+            $('.progress-bar-fill').css('width',100 * (doneVideoCount) / allVideos.length + '%');
 
             const video = ytVideos.find(function(element) {
               return element.playlistVideoRenderer.videoId == item.id;
             });
 
+            if (response.error) {
+              fillErrors({error: 'Can\'t clear card:', video: video});
+
+              reject(response.videoId);
+              
+              return;
+            }
+
             video["cards"] = response.feature_templates;
-
-            doneVideoCount++;
-
-            $('.progress-bar span').text('Deleting cards');
-            $('.progress-bar-fill').css('width',100 * (doneVideoCount) / allVideos.length + '%');
 
             if (idx === array.length - 1) {
               resolve();
@@ -421,6 +443,17 @@ export default function() {
         );
       });
     });
+  }
+
+  function fillErrors(options) {
+    const {video} = options;
+    $('.error-block').removeClass('hidden');
+
+    $('.errors-list').append(listItemTmp(
+        `${options.error} ${video.playlistVideoRenderer.title} (${video.playlistVideoRenderer.videoId})`, 
+        'error'
+      )
+    );
   }
 
   function getYtScripts(response) {
@@ -515,6 +548,9 @@ export default function() {
 
     $('.b-input-x').val('');
     $('.js-video-count').addClass('hide');
+    $('.error-block').addClass('hidden');
+    $('.success-text').addClass('hidden');
+    $('.errors-list').html('');
   }
 
   function getParams(links, item, i) {
@@ -556,7 +592,7 @@ export default function() {
       params.start_ms = lengthStep;
     }
 
-    if (links[i].indexOf('youtube') > -1) {
+    if (links[i].indexOf('user') > -1 || links[i].indexOf('channel') > -1) {
       delete params.action_create_video;
       params['action_create_collaborator'] = 1;
       params['channel_url'] = links[i];
@@ -599,6 +635,10 @@ export default function() {
 
     $(".video_item_id").each((idx, item) => {
       if (item.value) {
+        if (item.value.indexOf('/watch?v=') > -1) {
+          item.value = item.value.split('/watch?v=')[1]; 
+        }
+        
         links.push(item.value);
       }
     });
@@ -607,6 +647,10 @@ export default function() {
 
     $('.progress-bar').addClass('_show');
     $('.progress-bar-fill').css('width', 0 + '%');
+
+    $('.success-text').addClass('hidden');
+    $('.error-block').addClass('hidden');
+    $('.errors-list').html('');
 
     ytVideos = topPlVideos.concat(newVideos).concat(mostViewedVideos);
 
@@ -659,17 +703,22 @@ export default function() {
           return setCard(subItem, clearArray).then(() => {
             if (idx === array.length - 1) {
               $('.progress-bar').removeClass('_show');
+              $('.success-text').removeClass('hidden');
 
               getTemplates();
             }
           });
-        }).catch(() => {
-          console.log('error');
+        }).catch((e) => {
+
+          if (idx === array.length - 1) {
+            $('.progress-bar').removeClass('_show');
+            $('.success-text').removeClass('hidden');
+          }
         });
       }, Promise.resolve());
     }
 
-    if (filledSubArray.length) {
+    const clearCardPromise = () => {
       doneVideoCount = 0;
 
       filledSubArray.reduce((previousPromise, subItem, idx, array) => {
@@ -679,10 +728,17 @@ export default function() {
               setCardPromise();
             }
           });
-        }).catch(() => {
-          console.log('error');
+        }).catch((e) => {
+
+          if (idx === array.length - 1) {
+            setCardPromise();
+          }
         });
       }, Promise.resolve());
+    }
+
+    if (filledSubArray.length) {
+      clearCardPromise();
 
       return;
     }
