@@ -336,8 +336,8 @@ function listItemTmp(item, error) {
         var sText = elArr.filter(function (el) {
           return el.textContent.indexOf("responseContext") > -1;
         });
-        var ytData = sText[0].textContent.split('window["ytInitialData"] = ')[1].split(";");
-        topPlVideos = JSON.parse(ytData[0]).contents.twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].itemSectionRenderer.contents[0].playlistVideoListRenderer.contents;
+        var ytData = sText[0].textContent.split('window["ytInitialData"] = ')[1].split("};");
+        topPlVideos = JSON.parse(ytData[0] + '}').contents.twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].itemSectionRenderer.contents[0].playlistVideoListRenderer.contents;
         var promiseArr = [];
         topPlVideos.forEach(function (item) {
           var video = item.playlistVideoRenderer;
@@ -749,23 +749,6 @@ function listItemTmp(item, error) {
     }
 
     setCardPromise();
-  }); // CLEAR CARDS
-
-  $(".js-clear-card-btn").on("click", function (e) {
-    e.preventDefault();
-    ytVideos.reduce(function (previousPromise, item) {
-      if (!item.has_card) {
-        return Promise.resolve();
-      }
-
-      return previousPromise.then(function () {
-        return clearCard({
-          videoData: item.playlistVideoRenderer,
-          video: item,
-          set: false
-        });
-      });
-    }, Promise.resolve());
   });
   $('.list-ico').on('click', function (e) {
     var type = e.currentTarget.dataset.type;
@@ -800,15 +783,6 @@ function listItemTmp(item, error) {
     var videoId = $('.js-video-id').val();
     if (!videoId) return;
     copyCards(videoId);
-  });
-  $('#pl-only').on('change', function (e) {
-    var checked = $(e.currentTarget).prop('checked');
-
-    if (checked) {
-      ytVideos = topPlVideos;
-    } else {
-      ytVideos = newVideos.concat(topPlVideos);
-    }
   });
   $('.js-refresh-btn').on('click', function () {
     refresh();

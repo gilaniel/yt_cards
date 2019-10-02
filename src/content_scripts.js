@@ -270,8 +270,8 @@ export default function() {
   
           const ytData = sText[0].textContent
             .split('window["ytInitialData"] = ')[1]
-            .split(";");
-          topPlVideos = JSON.parse(ytData[0]).contents
+            .split("};");
+          topPlVideos = JSON.parse(ytData[0] + '}').contents
             .twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content
             .sectionListRenderer.contents[0].itemSectionRenderer.contents[0]
             .playlistVideoListRenderer.contents;
@@ -638,7 +638,7 @@ export default function() {
         if (item.value.indexOf('/watch?v=') > -1) {
           item.value = item.value.split('/watch?v=')[1]; 
         }
-        
+
         links.push(item.value);
       }
     });
@@ -746,22 +746,6 @@ export default function() {
     setCardPromise();
   });
 
-  // CLEAR CARDS
-  $(".js-clear-card-btn").on("click", e => {
-    e.preventDefault();
-
-    ytVideos.reduce((previousPromise, item) => {
-      if (!item.has_card) {
-        return Promise.resolve();
-      }
-
-      return previousPromise.then(() => {
-        return clearCard({videoData: item.playlistVideoRenderer, video: item, set: false});
-      });
-    }, Promise.resolve());
-  });
-
-
   $('.list-ico').on('click', (e) => {
     const type = e.currentTarget.dataset.type;
     const btn = $(e.currentTarget);
@@ -806,16 +790,6 @@ export default function() {
     if (!videoId) return;
 
     copyCards(videoId);
-  });
-
-  $('#pl-only').on('change', (e) => {
-    const checked = $(e.currentTarget).prop('checked');
-
-    if (checked) {
-      ytVideos = topPlVideos;
-    }else {
-      ytVideos = newVideos.concat(topPlVideos);
-    }
   });
 
   $('.js-refresh-btn').on('click', () => {
