@@ -5,11 +5,13 @@ const pathModules = path.resolve(__dirname);
 module.exports = {
 	context: path.resolve(__dirname),
 	entry: {
-		App: './src/index.js'
+    content_scripts: './src/index.js',
+    popup: './src/popup',
+    editor: './src/editor'
 	},
 	output: {
 		path: path.resolve(__dirname, './build/'),
-		filename: 'content_scripts.js',
+		filename: '[name].js',
 		chunkFilename: '[name].js'
 	},
 	watch: true,

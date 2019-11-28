@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body class="popup">
+  <div class="container">
+    <img src="loader.gif" class="loader" width="50" style="margin: 0;">
+    <button class="js-make-screen-btn screenshot hidden" data-title="Make screenshot"></button>
+    <div class="error hidden" style="color: #f92626;"></div>
+    <form class="login-form hidden">
+      <br>
+      <input class="text login" name="login" type="text" placeholder="Login">
+      <br>
+      <br>
+      <input class="text login" name="password" type="password" placeholder="Password">
+      <br>
+      <br>
+      <button class="js-send-btn" data-title="Send"></button>
+    </form>
+  </div>
+  <script src="js/jquery.min.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

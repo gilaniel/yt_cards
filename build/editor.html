@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="controls">
+    <span>Line width:</span>
+    <input class="line-width-range text" type="number" min="1" max="50" value="5" width="50">
+    <input class="line-width-range range" type="range" min="1" max="50" value="5">
+    <button class="clear-canvas" data-title="Clear"></button>
+  </div>
+
+  <canvas id="canvas" width="1920" height="917"></canvas>
+
+  <textarea class="text" placeholder="Comment"></textarea>
+  <div>
+    <button class="send" data-title="Send"></button>
+  </div>
+  <br>
+  <br>
+  <br>
+  <script src="js/jquery.min.js"></script>
+  <script src="js/fabric.js"></script>
+  <script src="editor.js"></script>
+</body>
+</html>

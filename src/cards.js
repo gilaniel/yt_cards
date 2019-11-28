@@ -83,11 +83,11 @@ export default function() {
 
 			serviceParams.forEach(function(item) {
 				if (item.service === 'GUIDED_HELP') {
-					ytId = item.params[0].value;
+					channelId = item.params[0].value;
 				}
 			});
 
-			if (ytId) {
+			if (channelId) {
 				checkAuthState(elArr,channelId);
 
 				return;

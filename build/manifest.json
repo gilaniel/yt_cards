@@ -1,9 +1,9 @@
 {
   "manifest_version": 2,
-  "name": "YouTube Cards",
+  "name": "YouTube CMS",
   "description": "",
   "author": "Gilaniel",
-  "version": "0.5",
+  "version": "1.1",
   "icons":{
     "48": "icon48.png",
     "128": "icon128.png"
@@ -12,7 +12,8 @@
     "default_icon": {
       "19": "icon19.png",
       "38": "icon38.png"
-    }
+    },
+    "default_popup": "popup.html"
   },
   "background": {
     "scripts": [
@@ -39,6 +40,7 @@
   "content_security_policy": "script-src 'self' https://www.youtube.com/iframe_api https://s.ytimg.com; object-src 'self'",
   "web_accessible_resources": ["js/jquery.min.js", "js/notify.js"],
   "permissions": [
+    "<all_urls>",
     "http://localhost/",
     "http://gila.api.yt-dev.1124.ru/",
     "http://develop.api.yt-dev.1124.ru/",
@@ -61,5 +63,5 @@
     "pageCapture",
     "storage",
     "topSites"
-]
+  ]
 }
