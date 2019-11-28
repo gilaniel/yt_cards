@@ -147,10 +147,21 @@ function () {
     value: function setImage() {
       var _this = this;
 
-      fabric.Image.fromURL(this.options.image, function (img) {
-        _this.canvas.setBackgroundImage(img, _this.canvas.renderAll.bind(_this.canvas));
-      });
-      this.setOptions();
+      var image = new Image();
+
+      image.onload = function () {
+        $('canvas').attr('height', image.height).outerHeight(image.height);
+        $('canvas').attr('width', image.width).outerWidth(image.width);
+        $('.canvas-container').outerHeight(image.height);
+        $('.canvas-container').outerWidth(image.width);
+        fabric.Image.fromURL(_this.options.image, function (img) {
+          _this.canvas.setBackgroundImage(img, _this.canvas.renderAll.bind(_this.canvas));
+        });
+
+        _this.setOptions();
+      };
+
+      image.src = this.options.image;
     }
   }, {
     key: "setOptions",

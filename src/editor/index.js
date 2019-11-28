@@ -42,12 +42,23 @@ class Editor {
   }
 
   setImage() {
-    fabric.Image.fromURL(this.options.image, (img) => {
-      this.canvas.setBackgroundImage(img, this.canvas.renderAll.bind(this.canvas));
+    const image = new Image();
 
-    }); 
+    image.onload = () => {
+      $('canvas').attr('height', image.height).outerHeight(image.height);
+      $('canvas').attr('width', image.width).outerWidth(image.width);
+      $('.canvas-container').outerHeight(image.height);
+      $('.canvas-container').outerWidth(image.width);
 
-    this.setOptions();
+      fabric.Image.fromURL(this.options.image, (img) => {
+        this.canvas.setBackgroundImage(img, this.canvas.renderAll.bind(this.canvas));
+  
+      }); 
+
+      this.setOptions();
+    }
+
+    image.src = this.options.image;
   }
 
   setOptions() {
