@@ -103,7 +103,7 @@ function _defineProperties(target, props) { for (var i = 0; i < props.length; i+
 function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }
 
 
-chrome.storage.local.get(['image', 'title', 'url'], function (result) {
+chrome.storage.local.get(['image', 'title', 'url', 'apiKey'], function (result) {
   var editor = new Editor(result);
   editor.setImage();
   editor.ui().clearBtn.on('click', function () {

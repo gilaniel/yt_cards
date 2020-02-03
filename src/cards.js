@@ -38,6 +38,13 @@ export default function() {
 
   checkUser();
 
+  chrome.extension.onMessage.addListener(function(msg, sender, sendResponse) {
+
+    if (msg.action == 'check_user') {
+      checkUser();
+    }
+  });
+
   function getYtAr(channelId) {
     chrome.runtime.sendMessage({ action: "get_yt_ar", channelId: channelId }, response => {
       const elArr = getYtScripts(response);

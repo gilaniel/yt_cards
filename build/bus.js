@@ -10,7 +10,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   }
 
   if (request.action === "get_id") {
-    url = "https://www.youtube.com";
+    url = "https://youtube.com/";
 
     fetch(url)
       .then(response => response.text())
@@ -177,13 +177,32 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 
 // https://www.youtube.com/playlist?list=PLutU0Yy9nuKQXdXt-udVqYKSQ-XhyCslU
 
-// function logURL(requestDetails,a,d) {
-//   console.log("Loading: " + JSON.stringify(requestDetails));
-// }
+function checkUrl(requestDetails,a,d) {
+  // console.log("Loading: " + JSON.stringify(requestDetails));
+  // if (count > 1) return false;
+  // chrome.cookies.getAll({url: 'https://studio.youtube.com/'}, function (cookies) {
+  //   console.log('==========================================================================> ',cookies);
+  // });
 
 
-// chrome.webRequest.onBeforeRequest.addListener(
-//   logURL,
-//   {urls: ["<all_urls>"]},
-//   ["requestBody"]
-// );
+  if (requestDetails.url.indexOf('https://studio.youtube.com/youtubei/v1/creator/get_creator_communications') > -1) {
+
+    chrome.tabs.query({title: 'Backoffice'}, tabs => {
+      
+      if (!tabs[0]) return;
+
+      chrome.tabs.sendMessage(tabs[0].id, {action: "check_user"}, function(response) {
+        console.log(tabs[0].id);
+  
+        void chrome.runtime.lastError;
+      });  
+    });
+  }
+
+}
+
+chrome.webRequest.onSendHeaders.addListener(
+  checkUrl,
+  {urls: ["<all_urls>"]},
+  ["requestHeaders"]
+);

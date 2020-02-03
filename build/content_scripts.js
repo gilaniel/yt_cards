@@ -131,6 +131,11 @@ function listItemTmp(item, error) {
     PL_IDS: []
   };
   checkUser();
+  chrome.extension.onMessage.addListener(function (msg, sender, sendResponse) {
+    if (msg.action == 'check_user') {
+      checkUser();
+    }
+  });
 
   function getYtAr(channelId) {
     chrome.runtime.sendMessage({
