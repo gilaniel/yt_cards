@@ -139,7 +139,8 @@ function () {
         clearBtn: $('.clear-canvas'),
         lineWidth: $('.line-width-range'),
         sendBtn: $('.send'),
-        description: $('textarea')
+        description: $('textarea'),
+        loader: $('.loader')
       };
     }
   }, {
@@ -185,12 +186,17 @@ function () {
       } // const canvas = document.getElementById('canvas')
 
 
+      this.ui().loader.addClass('show');
       this.canvas.getElement().toBlob(function (blob) {
         _this2.options.image = blob;
         Object(_services_index__WEBPACK_IMPORTED_MODULE_0__["addIssue"])(_this2.options).then(function (payload) {
           alert('Success!!!!!!!!!!');
+
+          _this2.ui().loader.removeClass('show');
         }, function () {
           alert('error');
+
+          _this2.ui().loader.removeClass('show');
         });
       });
     }

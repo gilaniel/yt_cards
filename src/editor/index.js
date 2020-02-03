@@ -37,7 +37,8 @@ class Editor {
       clearBtn: $('.clear-canvas'),
       lineWidth: $('.line-width-range'),
       sendBtn: $('.send'),
-      description: $('textarea')
+      description: $('textarea'),
+      loader: $('.loader')
     }
   }
 
@@ -78,13 +79,17 @@ class Editor {
 
     // const canvas = document.getElementById('canvas')
 
+    this.ui().loader.addClass('show');
+
     this.canvas.getElement().toBlob((blob) => {
       this.options.image = blob;
 
       addIssue(this.options).then((payload) => {
         alert('Success!!!!!!!!!!');
+        this.ui().loader.removeClass('show');
       }, () => {
         alert('error');
+        this.ui().loader.removeClass('show');
       });
     });
 

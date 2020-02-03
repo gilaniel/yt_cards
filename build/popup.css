@@ -126,3 +126,19 @@ input, span, button {
   display: inline-block;
   margin: 10px 0 0;
 }
+
+.submit-block {
+  position: relative;
+  display: inline-block;
+}
+
+.submit-block .loader {
+  position: absolute;
+  top: -12px;
+  right: -50px;
+  display: none;
+}
+
+.submit-block .loader.show{
+  display: block;
+}
