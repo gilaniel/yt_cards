@@ -112,7 +112,7 @@ function () {
 
     this.id = chrome.app.getDetails().id;
     this.autorized = false;
-    this.apiKey = false;
+    this.api_key = false;
   }
 
   _createClass(Popup, [{
@@ -132,7 +132,7 @@ function () {
       var _this = this;
 
       Object(_services_index__WEBPACK_IMPORTED_MODULE_0__["status"])({
-        key: this.apiKey
+        key: this.api_key
       }).then(function () {
         _this.autorized = true;
         setTimeout(function () {
@@ -153,8 +153,8 @@ function () {
     value: function getApiKey() {
       var _this2 = this;
 
-      chrome.storage.local.get('apiKey', function (result) {
-        _this2.apiKey = result.apiKey;
+      chrome.storage.local.get('api_key', function (result) {
+        _this2.api_key = result.api_key;
 
         _this2.fetchStatus();
       });
@@ -212,9 +212,9 @@ $(function () {
     popup.toggleLoad(false);
     Object(_services_index__WEBPACK_IMPORTED_MODULE_0__["login"])(data).then(function (payload) {
       chrome.storage.local.set({
-        'apiKey': payload
+        'api_key': payload
       });
-      popup.apiKey = payload;
+      popup.api_key = payload;
       popup.autorized = true;
       popup.toggleLoad(true);
       popup.showContent();
@@ -246,8 +246,9 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "login", function() { return login; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "addIssue", function() { return addIssue; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "status", function() { return status; });
+var PORT = 5000;
 function login(data) {
-  return $.post('http://127.0.0.1:8010/login', data);
+  return $.post('http://127.0.0.1:' + PORT + '/login', data);
 }
 function addIssue(options) {
   var data = new FormData();
@@ -258,14 +259,14 @@ function addIssue(options) {
 
   return $.ajax({
     type: 'POST',
-    url: 'http://127.0.0.1:8010/add_issue',
+    url: 'http://127.0.0.1:' + PORT + '/add_issue',
     data: data,
     contentType: false,
     processData: false
   });
 }
 function status(data) {
-  return $.post('http://127.0.0.1:8010/status', data);
+  return $.post('http://127.0.0.1:' + PORT + '/status', data);
 }
 
 /***/ })

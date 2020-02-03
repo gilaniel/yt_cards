@@ -103,7 +103,7 @@ function _defineProperties(target, props) { for (var i = 0; i < props.length; i+
 function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }
 
 
-chrome.storage.local.get(['image', 'title', 'url', 'apiKey'], function (result) {
+chrome.storage.local.get(['image', 'title', 'url', 'api_key'], function (result) {
   var editor = new Editor(result);
   editor.setImage();
   editor.ui().clearBtn.on('click', function () {
@@ -213,8 +213,9 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "login", function() { return login; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "addIssue", function() { return addIssue; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "status", function() { return status; });
+var PORT = 5000;
 function login(data) {
-  return $.post('http://127.0.0.1:8010/login', data);
+  return $.post('http://127.0.0.1:' + PORT + '/login', data);
 }
 function addIssue(options) {
   var data = new FormData();
@@ -225,14 +226,14 @@ function addIssue(options) {
 
   return $.ajax({
     type: 'POST',
-    url: 'http://127.0.0.1:8010/add_issue',
+    url: 'http://127.0.0.1:' + PORT + '/add_issue',
     data: data,
     contentType: false,
     processData: false
   });
 }
 function status(data) {
-  return $.post('http://127.0.0.1:8010/status', data);
+  return $.post('http://127.0.0.1:' + PORT + '/status', data);
 }
 
 /***/ })

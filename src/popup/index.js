@@ -4,7 +4,7 @@ class Popup {
   constructor() {
     this.id = chrome.app.getDetails().id;
     this.autorized = false;
-    this.apiKey = false;
+    this.api_key = false;
   }
 
   ui() {
@@ -18,7 +18,7 @@ class Popup {
   }
 
   fetchStatus() {
-    status({ key: this.apiKey })
+    status({ key: this.api_key })
       .then(() => {
         this.autorized = true;
 
@@ -35,8 +35,8 @@ class Popup {
   }
 
   getApiKey() {
-    chrome.storage.local.get('apiKey', (result) => {
-      this.apiKey = result.apiKey;
+    chrome.storage.local.get('api_key', (result) => {
+      this.api_key = result.api_key;
 
       this.fetchStatus();
     });
@@ -86,9 +86,9 @@ $(() => {
     popup.toggleLoad(false);
 
     login(data).then((payload) => {
-      chrome.storage.local.set({ 'apiKey': payload });
+      chrome.storage.local.set({ 'api_key': payload });
 
-      popup.apiKey = payload;
+      popup.api_key = payload;
       popup.autorized = true;
 
       popup.toggleLoad(true);

@@ -1,6 +1,6 @@
 import {addIssue} from '../services/index';
 
-chrome.storage.local.get(['image', 'title', 'url', 'apiKey'], function(result) {
+chrome.storage.local.get(['image', 'title', 'url', 'api_key'], function(result) {
   const editor = new Editor(result);
 
   editor.setImage();
