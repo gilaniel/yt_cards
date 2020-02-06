@@ -1,0 +1,66 @@
+html,body {
+  min-height: inherit;
+}
+
+.canvas-container {
+  /* max-width: 1280px;
+  max-height: 611.3333333333333px; */
+  /* width: 100%!important;
+  height: 100%!important; */
+  margin: 0 auto 50px;
+}
+
+canvas {
+  margin: 20px 0;
+  /* width: 100%!important;
+  height: 100%!important; */
+}
+
+img {
+  margin: 20px 0;
+}
+
+.hidden {
+  display: none;
+}
+
+input.login {
+  width: 160px;
+  /* border: none; */
+  border-radius: 0px;
+}
+
+.line-width {
+  width: 50px;
+  margin-right: 20px;
+}
+
+input, span, button {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.line-width-range {
+  margin-right: 20px;
+}
+
+.controls {
+  display: inline-block;
+  margin: 10px 0 0;
+}
+
+.submit-block {
+  position: relative;
+  display: inline-block;
+}
+
+.submit-block .loader {
+  position: absolute;
+  top: -12px;
+  right: -50px;
+  display: none;
+}
+
+.submit-block .loader.show{
+  display: block;
+}

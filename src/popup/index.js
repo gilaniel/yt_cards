@@ -1,5 +1,6 @@
-import {login, status} from '../services/index';
+import {Common} from '../services';
 
+const common = new Common();
 class Popup {
   constructor() {
     this.id = chrome.app.getDetails().id;
@@ -10,6 +11,8 @@ class Popup {
   ui() {
     return {
       screenBtn: $('.js-make-screen-btn'),
+      tasksBtn: $('.js-tasks-btn'),
+      workBlock: $('.work-block'),
       loginForm: $('.login-form'),
       sendBtn: $('.js-send-btn'),
       error: $('.error'),
@@ -18,7 +21,7 @@ class Popup {
   }
 
   fetchStatus() {
-    status({ key: this.api_key })
+    common.fetchStatus({ key: this.api_key })
       .then(() => {
         this.autorized = true;
 
@@ -43,7 +46,7 @@ class Popup {
   }
 
   showContent() {
-    this.ui().screenBtn.toggleClass('hidden', !this.autorized);
+    this.ui().workBlock.toggleClass('hidden', !this.autorized);
     this.ui().loginForm.toggleClass('hidden', this.autorized);
   }
 
@@ -63,8 +66,8 @@ class Popup {
     });  
   }
 
-  openNewTab() {
-    const win = window.open(`chrome-extension://${popup.id}/editor.html?blank`, '_blank');
+  openNewTab(page = 'editor') {
+    const win = window.open(`chrome-extension://${popup.id}/${page}.html?blank`, '_blank');
     win.focus();
   }
 
@@ -85,7 +88,7 @@ $(() => {
 
     popup.toggleLoad(false);
 
-    login(data).then((payload) => {
+    common.login(data).then((payload) => {
       chrome.storage.local.set({ 'api_key': payload });
 
       popup.api_key = payload;
@@ -107,5 +110,9 @@ $(() => {
   
       popup.fetchTabData();
     });
+  });
+
+  popup.ui().tasksBtn.on('click', () => {
+    popup.openNewTab('tasks');
   });
 });

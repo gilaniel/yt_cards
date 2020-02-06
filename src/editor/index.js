@@ -1,4 +1,6 @@
-import {addIssue} from '../services/index';
+import {Common} from '../services';
+
+const common = new Common();
 
 chrome.storage.local.get(['image', 'title', 'url', 'api_key'], function(result) {
   const editor = new Editor(result);
@@ -25,7 +27,9 @@ chrome.storage.local.get(['image', 'title', 'url', 'api_key'], function(result) 
 
 class Editor {
   constructor(options) {
+    this.image = options.image;
     this.options = options;
+
     this.canvas = new fabric.Canvas('canvas', {
       isDrawingMode: true
     });
@@ -51,7 +55,10 @@ class Editor {
       $('.canvas-container').outerHeight(image.height);
       $('.canvas-container').outerWidth(image.width);
 
-      fabric.Image.fromURL(this.options.image, (img) => {
+      this.canvas.height = image.height;
+      this.canvas.width = image.width;
+
+      fabric.Image.fromURL(this.image, (img) => {
         this.canvas.setBackgroundImage(img, this.canvas.renderAll.bind(this.canvas));
   
       }); 
@@ -59,7 +66,7 @@ class Editor {
       this.setOptions();
     }
 
-    image.src = this.options.image;
+    image.src = this.image;
   }
 
   setOptions() {
@@ -74,22 +81,20 @@ class Editor {
 
   sendData() {
     if (this.ui().description.val()) {
-      this.options['description'] = this.ui().description.val()
+      this.options['description'] = this.ui().description.val();
     }
 
-    // const canvas = document.getElementById('canvas')
-
-    this.ui().loader.addClass('show');
+    this.ui().loader.toggleClass('show');
 
     this.canvas.getElement().toBlob((blob) => {
       this.options.image = blob;
 
-      addIssue(this.options).then((payload) => {
+      common.addIssue(this.options).then((payload) => {
         alert('Success!!!!!!!!!!');
-        this.ui().loader.removeClass('show');
+        this.ui().loader.toggleClass('show');
       }, () => {
         alert('error');
-        this.ui().loader.removeClass('show');
+        this.ui().loader.toggleClass('show');
       });
     });
 
